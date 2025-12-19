@@ -360,6 +360,9 @@ class AdvancedCSSRenderer(HTMLParser):
         if tag == "br":
             self.htmlCollection.addObject("br")
             return
+        
+        if tag == "span":
+            pass
 
         styles = {}
         styles.update(self.css_rules.get(tag, {}))
@@ -538,6 +541,31 @@ def browse(url, root = None, isHtml = False):
                         print(f"Error loading image {src}: {e}")
                         error_label = tk.Label(inline_container, text=f"[Image: {src},{e}]", fg="red")
                         error_label.pack(side="left", anchor="nw")
+                
+                elif element.type == "input":
+                    input_type = element.data.get("attrs", {}).get("type", "text")
+                    if input_type in ("text", "password", "email", "search", "tel", "url"):
+                        entry = tk.Entry(inline_container)
+                        if input_type == "password":
+                            entry.config(show="*")
+                        entry.pack(side="left", anchor="nw")
+                        element.boundObject = entry
+                    elif input_type in ("button", "submit", "reset"):
+                        button_text = element.data.get("attrs", {}).get("value", "Button")
+                        button = tk.Button(inline_container, text=button_text)
+                        
+                        onclick_js = element.data.get("attrs", {}).get("onclick")
+                        if element.onclick:
+                            onclick_js = element.onclick
+
+                        if onclick_js:
+                            def make_callback(js_code):
+                                return lambda: cssrenderer.js.run(js_code)
+                            button.config(command=make_callback(onclick_js))
+                        
+                        button.pack(side="left", anchor="nw")
+                        element.boundObject = button
+
 
                 elif element.data.get("content") or element.data.get("attrs",{}).get("id"):
                     content = element.data.get("content","None")
