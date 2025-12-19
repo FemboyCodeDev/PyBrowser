@@ -13,6 +13,9 @@ class HTMLElement():
         self.data = element_data
         self.id = id
         self.tags = tags if tags is not None else []
+        self.boundObject = None
+        self.onclick = None
+        self.JSOveride = {}
 
 
 class HTMLCollection():
@@ -175,20 +178,59 @@ class SimpleJSInterpreter:
                 self.vars[m.group(1)] = self.eval_value(m.group(2))
                 i += 1
                 continue
+            # -------- const assignment --------
+            m = re.match(r'const\s+(\w+)\s*=\s*(.+)', line)
+            if m:
+                self.vars[m.group(1)] = self.eval_value(m.group(2))
+                i += 1
+                continue
             # -------- docuemnt functions -------
             # for stuff like document.getElementById()
-            m = re.match(r"document\.(\w+)\((.+?)\)", line)
+            m = re.match(r"document\.(\w+)\((.+?)\)\.?(\w+)?", line)
             if m:
                 #document.getElementById(id)
                 if m.group(1) == "getElementById":
                     element = None
-                    print(m.group(1),m.group(2))
-                    print(self.html_collection.elements)
+                    #print(m.group(1),m.group(2))
+                    #print(self.html_collection.elements)
+                    targetId = m.group(2)
+                    if targetId[0] == "'" and targetId[-1] == "'":
+                        targetId = targetId[1:-1]
+                    elif targetId[0] == '"' and targetId[-1] == '"':
+                        targetId = targetId[1:-1]
+                    print(targetId)
                     for item in self.html_collection.elements:
-                        print(item.id)
-                        if item.id == m.group(2):
+                        print(item.id,targetId)
+                        if item.id == targetId:
                             element = item
                             break
+                    #print(m.group(3))
+                    if m.group(3) == "onclick":
+                        body = []
+                        i += 1
+                        while i < len(lines) and "}" not in lines[i]:
+                            body.append(lines[i])
+                            i += 1
+                        func = ";".join(body)
+                        print(func)
+                        i += 1
+                        print(element)
+                        if element is not None:
+                            element.onclick = func
+                        continue
+                    if m.group(3) == "innerText":
+                        print(element)
+                        if element is not None:
+                            text = m.split(",",1)
+                            print(text)
+                            element.JSOveride["innerText"] =text
+                            element.boundObject.configure(text=text[1])
+                            element.boundObject.configure(text="test")
+
+                        i+=1
+
+                        continue
+
                     #
 
 
@@ -300,6 +342,7 @@ class AdvancedCSSRenderer(HTMLParser):
             self.tag_stack.pop()
             # Add an end marker for block-level elements to handle newlines
             if tag in {"p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "li", "button"}:
+                print(self.tag_stack,tag)
                 self.htmlCollection.addObject(f"end_{tag}")
 
 
@@ -313,7 +356,7 @@ class AdvancedCSSRenderer(HTMLParser):
             tag, attrs, _ = self.tag_stack[-1]
             # Get all styles from the stack to handle nesting
             style_tags = [s for _, _, s in self.tag_stack]
-            print(attrs)
+            #print(attrs)
             self.htmlCollection.addObject(tag, {"content": data.strip(), "attrs": attrs}, tags=style_tags,element_id=attrs.get("id",None))
 
     # ---------- CSS ----------
@@ -453,22 +496,39 @@ def browse(url, root = None, isHtml = False):
 
                 if element.type == "button":
                     button = tk.Button(inline_container, **widget_config)
-                    onclick = element.data.get("attrs", {}).get("onclick")
-                    if onclick:
+
+                    onclick_js = element.data.get("attrs", {}).get("onclick")
+                    if element.onclick:
+                        onclick_js = element.onclick
+
+                    if onclick_js:
                         def make_callback(js_code):
                             return lambda: cssrenderer.js.run(js_code)
-                        button.config(command=make_callback(onclick))
+                        button.config(command=make_callback(onclick_js))
+
+                    element.boundObject = button
                     button.pack(side="left", anchor="nw")
                 else:
                     label = TransparentLabel(inline_container, **widget_config)
-                    if element.type == "a":
+
+                    onclick_js = element.data.get("attrs", {}).get("onclick")
+                    if element.onclick:
+                        onclick_js = element.onclick
+
+                    if onclick_js:
+                        label.config(cursor="hand2")
+                        def make_callback(js_code):
+                            return lambda e: cssrenderer.js.run(js_code)
+                        label.bind("<Button-1>", make_callback(onclick_js))
+                    elif element.type == "a":
                         link_url = element.data.get("attrs", {}).get("href")
                         if link_url:
                             label.config(fg="blue", cursor="hand2", underline=True)
-                            
                             def make_callback(url_to_open):
                                 return lambda e: browse(createAbsoluteURL(url,url_to_open), root)
                             label.bind("<Button-1>", make_callback(link_url))
+
+                    element.boundObject = label
                     label.pack(side="left", anchor="nw")
 
 
