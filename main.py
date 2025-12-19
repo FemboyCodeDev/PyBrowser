@@ -507,6 +507,163 @@ class AdvancedCSSRenderer(HTMLParser):
                 props[k] = v
         return props
 
+def RenderCSS(cssrenderer,content_frame):
+    # A frame to hold inline elements for a single "line"
+    inline_container = tk.Frame(content_frame)
+    inline_container.pack(fill="x", anchor="w")
+    block_elements = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "li"}
+    text_elements_size = {"h1": 24, "h2": 20, "h3": 18, "h4": 16, "h5": 14, "h6": 12, "p": 10}
+    for element in cssrenderer.htmlCollection.elements:
+        try:
+            # print(element.type,element.data)
+            if element.type == "title" and element.data.get("content"):
+                root.title(element.data["content"])
+
+            elif element.type.startswith("end_") and element.type[4:] in block_elements:
+                # End of a block, start a new line for subsequent elements
+                inline_container = tk.Frame(content_frame)
+                inline_container.pack(fill="x", anchor="w")
+
+            elif element.type == "br":
+                inline_container = tk.Frame(content_frame)
+                inline_container.pack(fill="x", anchor="w")
+
+            elif element.type == "image":
+
+                try:
+                    src = element.data.get("src")
+                    if src and False:
+                        image_url = createAbsoluteURL(url, src)
+                        # print(image_url)
+                        # with urllib.request.urlopen(image_url) as r:
+                        #
+                        #    image_data = r.read()
+
+                        image_b64 = base64.b64encode(image_data)
+                        image = tk.PhotoImage(data=image_b64)
+
+                        label = tk.Label(inline_container, image=image)
+                        label.image = image  # Keep a reference!
+                        label.pack(side="left", anchor="nw")
+                        element.boundObject = label
+                except Exception as e:
+                    # tk.PhotoImage can fail if the image format is not supported (e.g., JPEG, PNG)
+                    # It primarily supports GIF and PGM/PPM.
+                    print(f"Error loading image {src}: {e}")
+                    error_label = tk.Label(inline_container, text=f"[Image: {src},{e}]", fg="red")
+                    error_label.pack(side="left", anchor="nw")
+
+            elif element.type == "input":
+                input_type = element.data.get("attrs", {}).get("type", "text")
+                if input_type in ("text", "password", "email", "search", "tel", "url"):
+                    entry = tk.Entry(inline_container)
+                    if input_type == "password":
+                        entry.config(show="*")
+                    entry.pack(side="left", anchor="nw")
+                    element.boundObject = entry
+                elif input_type in ("button", "submit", "reset"):
+                    button_text = element.data.get("attrs", {}).get("value", "Button")
+                    button = tk.Button(inline_container, text=button_text)
+
+                    onclick_js = element.data.get("attrs", {}).get("onclick")
+                    if element.onclick:
+                        onclick_js = element.onclick
+
+                    if onclick_js:
+                        def make_callback(js_code):
+                            return lambda: cssrenderer.js.run(js_code)
+
+                        button.config(command=make_callback(onclick_js))
+
+                    button.pack(side="left", anchor="nw")
+                    element.boundObject = button
+
+
+            elif element.data.get("content") or element.data.get("attrs", {}).get("id"):
+                content = element.data.get("content", "None")
+
+                style = {}
+                if element.tags:
+                    for tag_name in element.tags:
+                        if tag_name in cssrenderer.tag_styles:
+                            style.update(cssrenderer.tag_styles[tag_name])
+
+                font_family = "Arial"  # Hardcoded for now
+                font_family = style.get("font-family", [font_family])[0]
+                # print(font_family)
+                # print(style)
+                font_weight = style.get("weight", "normal")
+                font_size = style.get("size", text_elements_size.get(element.type, 12))
+
+                text_transform = style.get("text-transform", "none")
+
+                if text_transform == "uppercase":
+                    content = content.upper()
+
+                elif text_transform == "lowercase":
+                    content = content.lower()
+
+                elif text_transform == "capitalize":
+                    content = content.capitalize()
+
+                elif text_transform == "none":
+                    pass
+
+                widget_config = {
+                    "text": content,
+                    "font": (font_family, font_size, font_weight),
+                    "fg": style.get("foreground", "black"),
+                    "bg": style.get("background"),
+                }
+
+                widget_config = {k: v for k, v in widget_config.items() if v is not None}
+
+                if element.type == "button":
+                    button = tk.Button(inline_container, **widget_config)
+
+                    onclick_js = element.data.get("attrs", {}).get("onclick")
+                    if element.onclick:
+                        onclick_js = element.onclick
+
+                    if onclick_js:
+                        def make_callback(js_code):
+                            return lambda: cssrenderer.js.run(js_code)
+
+                        button.config(command=make_callback(onclick_js))
+
+                    element.boundObject = button
+                    button.pack(side="left", anchor="nw")
+                else:
+                    label = TransparentLabel(inline_container, **widget_config)
+
+                    onclick_js = element.data.get("attrs", {}).get("onclick")
+                    if element.onclick:
+                        onclick_js = element.onclick
+
+                    if onclick_js:
+                        label.config(cursor="hand2")
+
+                        def make_callback(js_code):
+                            return lambda e: cssrenderer.js.run(js_code)
+
+                        label.bind("<Button-1>", make_callback(onclick_js))
+                    elif element.type == "a":
+                        link_url = element.data.get("attrs", {}).get("href")
+                        if link_url:
+                            label.config(fg="blue", cursor="hand2", underline=True)
+
+                            def make_callback(url_to_open):
+                                return lambda e: searchAndStack(createAbsoluteURL(url, url_to_open), root)
+
+                            label.bind("<Button-1>", make_callback(link_url))
+
+                    element.boundObject = label
+                    side = style.get("text-align", "left")
+                    label.pack(side=side, anchor="nw")
+        except Exception as e:
+            print(e, type="error")
+            tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
+
 
 # ================== BROWSER ==================
 
@@ -537,161 +694,16 @@ def browse(url, root = None, isHtml = False):
         cssrenderer = AdvancedCSSRenderer()
         cssrenderer.feed(html)
 
-        # A frame to hold inline elements for a single "line"
-        inline_container = tk.Frame(content_frame)
-        inline_container.pack(fill="x", anchor="w")
-
-        block_elements = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "li"}
-        text_elements_size = {"h1": 24, "h2": 20, "h3": 18, "h4": 16, "h5": 14, "h6": 12, "p": 10}
-        
-        for element in cssrenderer.htmlCollection.elements:
-            try:
-                #print(element.type,element.data)
-                if element.type == "title" and element.data.get("content"):
-                    root.title(element.data["content"])
-
-                elif element.type.startswith("end_") and element.type[4:] in block_elements:
-                    # End of a block, start a new line for subsequent elements
-                    inline_container = tk.Frame(content_frame)
-                    inline_container.pack(fill="x", anchor="w")
-
-                elif element.type == "br":
-                    inline_container = tk.Frame(content_frame)
-                    inline_container.pack(fill="x", anchor="w")
-
-                elif element.type == "image":
-
-                    try:
-                        src = element.data.get("src")
-                        if src and False:
-                            image_url = createAbsoluteURL(url, src)
-                            #print(image_url)
-                            #with urllib.request.urlopen(image_url) as r:
-                            #
-                            #    image_data = r.read()
-                            
-                            image_b64 = base64.b64encode(image_data)
-                            image = tk.PhotoImage(data=image_b64)
-                            
-                            label = tk.Label(inline_container, image=image)
-                            label.image = image # Keep a reference!
-                            label.pack(side="left", anchor="nw")
-                            element.boundObject = label
-                    except Exception as e:
-                        # tk.PhotoImage can fail if the image format is not supported (e.g., JPEG, PNG)
-                        # It primarily supports GIF and PGM/PPM.
-                        print(f"Error loading image {src}: {e}")
-                        error_label = tk.Label(inline_container, text=f"[Image: {src},{e}]", fg="red")
-                        error_label.pack(side="left", anchor="nw")
-                
-                elif element.type == "input":
-                    input_type = element.data.get("attrs", {}).get("type", "text")
-                    if input_type in ("text", "password", "email", "search", "tel", "url"):
-                        entry = tk.Entry(inline_container)
-                        if input_type == "password":
-                            entry.config(show="*")
-                        entry.pack(side="left", anchor="nw")
-                        element.boundObject = entry
-                    elif input_type in ("button", "submit", "reset"):
-                        button_text = element.data.get("attrs", {}).get("value", "Button")
-                        button = tk.Button(inline_container, text=button_text)
-                        
-                        onclick_js = element.data.get("attrs", {}).get("onclick")
-                        if element.onclick:
-                            onclick_js = element.onclick
-
-                        if onclick_js:
-                            def make_callback(js_code):
-                                return lambda: cssrenderer.js.run(js_code)
-                            button.config(command=make_callback(onclick_js))
-                        
-                        button.pack(side="left", anchor="nw")
-                        element.boundObject = button
-
-
-                elif element.data.get("content") or element.data.get("attrs",{}).get("id"):
-                    content = element.data.get("content","None")
-
-                    style = {}
-                    if element.tags:
-                        for tag_name in element.tags:
-                            if tag_name in cssrenderer.tag_styles:
-                                style.update(cssrenderer.tag_styles[tag_name])
-
-                    font_family = "Arial" # Hardcoded for now
-                    font_family = style.get("font-family", [font_family])[0]
-                    #print(font_family)
-                    #print(style)
-                    font_weight = style.get("weight", "normal")
-                    font_size = style.get("size", text_elements_size.get(element.type, 12))
-
-                    text_transform = style.get("text-transform", "none")
-
-                    if text_transform == "uppercase":
-                        content = content.upper()
-
-                    elif text_transform == "lowercase":
-                        content = content.lower()
-
-                    elif text_transform == "capitalize":
-                        content = content.capitalize()
-
-                    elif text_transform == "none":
-                        pass
-
-                    widget_config = {
-                        "text": content,
-                        "font": (font_family, font_size, font_weight),
-                        "fg": style.get("foreground", "black"),
-                        "bg": style.get("background"),
-                    }
-
-                    widget_config = {k: v for k, v in widget_config.items() if v is not None}
-
-                    if element.type == "button":
-                        button = tk.Button(inline_container, **widget_config)
-
-                        onclick_js = element.data.get("attrs", {}).get("onclick")
-                        if element.onclick:
-                            onclick_js = element.onclick
-
-                        if onclick_js:
-                            def make_callback(js_code):
-                                return lambda: cssrenderer.js.run(js_code)
-                            button.config(command=make_callback(onclick_js))
-
-                        element.boundObject = button
-                        button.pack(side="left", anchor="nw")
-                    else:
-                        label = TransparentLabel(inline_container, **widget_config)
-
-                        onclick_js = element.data.get("attrs", {}).get("onclick")
-                        if element.onclick:
-                            onclick_js = element.onclick
-
-                        if onclick_js:
-                            label.config(cursor="hand2")
-                            def make_callback(js_code):
-                                return lambda e: cssrenderer.js.run(js_code)
-                            label.bind("<Button-1>", make_callback(onclick_js))
-                        elif element.type == "a":
-                            link_url = element.data.get("attrs", {}).get("href")
-                            if link_url:
-                                label.config(fg="blue", cursor="hand2", underline=True)
-                                def make_callback(url_to_open):
-                                    return lambda e: searchAndStack(createAbsoluteURL(url,url_to_open), root)
-                                label.bind("<Button-1>", make_callback(link_url))
 
 
 
-                        element.boundObject = label
-                        side = style.get("text-align","left")
-                        label.pack(side=side, anchor="nw")
-            except Exception as e:
-                print(e,type = "error")
-                tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
 
 
+        #====== Renderer Start ======
+
+        RenderCSS(cssrenderer, content_frame)
+
+        #==== Renderer End ====
 
     except Exception as e:
         tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
