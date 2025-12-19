@@ -138,9 +138,9 @@ class SimpleJSInterpreter:
 # ================== HTML + CSS RENDERER ==================
 
 class AdvancedCSSRenderer(HTMLParser):
-    def __init__(self, text_widget):
+    def __init__(self, root):
         super().__init__()
-        self.text = text_widget
+        self.root = root
         self.css_rules = {}
         self.tag_stack = []
 
@@ -150,7 +150,7 @@ class AdvancedCSSRenderer(HTMLParser):
         self.in_script = False
         self.script_buffer = ""
 
-        self.js = SimpleJSInterpreter(text_widget)
+        self.js = SimpleJSInterpreter(root)
 
         self.htmlCollection = HTMLCollection()
 
@@ -247,14 +247,16 @@ def browse(url):
     root = tk.Tk()
     root.title("Python Mini Browser")
 
-    txt = tk.Text(root, wrap="word")
-    txt.pack(expand=True, fill="both")
+
+
 
     try:
         with urllib.request.urlopen(url) as r:
             html = r.read().decode("utf-8", errors="ignore")
-        AdvancedCSSRenderer(txt).feed(html)
+        AdvancedCSSRenderer().feed(html)
     except Exception as e:
+        txt = tk.Text(root, wrap="word")
+        txt.pack(expand=True, fill="both")
         txt.insert(tk.END, f"Error: {e}")
 
     root.mainloop()
