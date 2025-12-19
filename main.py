@@ -155,16 +155,8 @@ class AdvancedCSSRenderer(HTMLParser):
         self.htmlCollection = HTMLCollection()
         self.js = SimpleJSInterpreter(self.htmlCollection)
 
-        self.tag = ""
-        self.attrs = {}
-
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-
-        print(tag)
-        self.tag = tag
-        print(attrs)
-        self.attrs = attrs
 
         if tag == "style":
             self.in_style = True
@@ -177,7 +169,7 @@ class AdvancedCSSRenderer(HTMLParser):
             return
 
         if tag == "br":
-            self.htmlCollection.addObject("br", tags=list(self.tag_stack))
+            self.htmlCollection.addObject("br")
             return
 
         styles = {}
@@ -188,9 +180,11 @@ class AdvancedCSSRenderer(HTMLParser):
             styles.update(self.css_rules.get("#" + attrs["id"], {}))
         styles.update(self.parse_css_block(attrs.get("style", "")))
 
-        tag_name = f"tk_{len(self.tag_stack)}"
-        self.tag_styles[tag_name] = styles
-        self.tag_stack.append(tag_name)
+        style_tag_name = f"style_{len(self.tag_styles)}"
+        self.tag_styles[style_tag_name] = styles
+        
+        # Push the tag, its attributes, and its generated style name to the stack
+        self.tag_stack.append((tag, attrs, style_tag_name))
 
     def handle_endtag(self, tag):
         if tag == "style":
@@ -201,22 +195,28 @@ class AdvancedCSSRenderer(HTMLParser):
 
         if tag == "script":
             self.in_script = False
-            self.js.run(self.script_buffer, self.tag_stack)
+            self.js.run(self.script_buffer, [s for _, _, s in self.tag_stack])
             self.script_buffer = ""
             return
 
-        if self.tag_stack:
+        if self.tag_stack and self.tag_stack[-1][0] == tag:
             self.tag_stack.pop()
+            # Add an end marker for block-level elements to handle newlines
+            if tag in {"p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "li"}:
+                self.htmlCollection.addObject(f"end_{tag}")
+
 
     def handle_data(self, data):
         if self.in_style:
             self.style_buffer += data
         elif self.in_script:
             self.script_buffer += data
-        else:
-            #print(data)
-
-            self.htmlCollection.addObject(self.tag, {"content": data,"attrs":self.attrs}, tags=list(self.tag_stack))
+        elif self.tag_stack:
+            # Get current tag info from the top of the stack
+            tag, attrs, _ = self.tag_stack[-1]
+            # Get all styles from the stack to handle nesting
+            style_tags = [s for _, _, s in self.tag_stack]
+            self.htmlCollection.addObject(tag, {"content": data.strip(), "attrs": attrs}, tags=style_tags)
 
     # ---------- CSS ----------
     def parse_global_css(self, css):
@@ -234,7 +234,7 @@ class AdvancedCSSRenderer(HTMLParser):
             elif k == "background-color":
                 props["background"] = v
             elif k == "font-weight" and v == "bold":
-                props["weight"] = "bold"
+                props["font"] = "bold"
             elif k == "font-size":
                 size = re.sub(r"\D", "", v)
                 if size:
@@ -245,111 +245,87 @@ class AdvancedCSSRenderer(HTMLParser):
 # ================== BROWSER ==================
 
 def browse(url, root = None, isHtml = False):
-    if root == None:
+    if root is None:
         root = tk.Tk()
     
+    # Clear previous content
+    for widget in root.winfo_children():
+        widget.destroy()
+
     root.title("Python Mini Browser")
 
-    #txt = tk.Text(root, wrap="word")
-    #txt.pack(expand=True, fill="both")
+    txt = tk.Text(root, wrap="word", font=("Arial", 12))
+    txt.pack(expand=True, fill="both")
 
     try:
         if not isHtml:
-            print("Opening URL")
             with urllib.request.urlopen(url) as r:
                 html = r.read().decode("utf-8", errors="ignore")
-            print("URL GOT")
         else:
             html = url
+            
         cssrenderer = AdvancedCSSRenderer()
         cssrenderer.feed(html)
 
+        # Configure all the styles found in the HTML
         for name, props in cssrenderer.tag_styles.items():
-            print("css",name,props)
-            continue
+            font_family = props.get("font", "Arial")
+            font_size = props.get("size", 12)
+            font_weight = props.get("weight", "normal")
+            
             txt.tag_configure(
                 name,
                 foreground=props.get("foreground", "black"),
                 background=props.get("background", "white"),
-                font=("Arial", props.get("size", 10), props.get("weight", "normal")),
+                font=(font_family, font_size, font_weight),
             )
-        fontSizes = {"p":16,"h1":32,"h2":24,"h3":20,"h4":18,"h5":16,"h6":14}   
-        for item in cssrenderer.css_rules:
 
-            print("css rules",item,cssrenderer.css_rules[item])
-            if item in fontSizes:
-                fontSizes[item] = cssrenderer.css_rules[item]["size"]
-        tkObjects = []
-        typeRemap = {"p":"text","h1":"text","h2":"text","h3":"text","h4":"text","h5":"text","h6":"text","a":"link"}
+        # Render the elements
+        block_elements = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "li"}
+        
         for element in cssrenderer.htmlCollection.elements:
-            
-            remmapedType = None
-            if element.type in typeRemap:
-                remmapedType = typeRemap[element.type]
+            if element.type == "title" and element.data.get("content"):
+                root.title(element.data["content"])
 
-
-            if element.type == "title":
-                root.title(element.data.get("content", ""))
-
-            if "text" in [element.type,remmapedType]:
-
-
-
-
-                text = element.data.get("content", "")
-
-                #print(element.data)
-                
-                txtTemp = tk.Label(root, text = text, font=("Helvetica", fontSizes[element.type]),justify="left", anchor="w")
-                txtTemp.pack(expand=False,anchor="w")
-                tkObjects.append(txtTemp)
-                #txtTemp.insert(tk.END, , element.tags)
-                tkObjects.append(txtTemp)
-            if "link" in [element.type, remmapedType]:
-                text = element.data.get("content","")
-                attrs = element.data.get("attrs","")
-                #print(attrs)
-
-                link = attrs.get("href","")
-
-                def clearAndBrowse(url,root,objects):
-                    for object in objects:
-                        object.destroy()
-                    browse(url,root)
-
-                
-
-                redirectFunction = lambda: clearAndBrowse(link,root, tkObjects)
-
-                labelTemp = tk.Button(root,text = text, command = redirectFunction)
-                #labelTemp.pack()
-                labelTemp.pack(expand=False,anchor="w")
-                tkObjects.append(labelTemp)
+            elif element.type.startswith("end_") and element.type[4:] in block_elements:
+                txt.insert(tk.END, "\n")
 
             elif element.type == "br":
-                labelTemp = tk.Label(root,text = "")
-                labelTemp.pack()
-                tkObjects.append(labelTemp)
+                txt.insert(tk.END, "\n")
 
+            elif element.data.get("content"):
+                content = element.data["content"]
+                tags = element.tags or []
+                
+                if element.type == "a":
+                    link_url = element.data.get("attrs", {}).get("href")
+                    if link_url:
+                        link_tag = f"link_{element.id}"
+                        txt.tag_configure(link_tag, foreground="blue", underline=True)
+                        
+                        # Use a closure to capture the URL for the callback
+                        def make_callback(url_to_open):
+                            return lambda e: browse(url_to_open, root)
+
+                        txt.tag_bind(link_tag, "<Button-1>", make_callback(link_url))
+                        tags.append(link_tag)
+
+                txt.insert(tk.END, content, tags)
+                # Add a space for inline elements to ensure separation
+                if element.type in {"a", "span", "strong", "em"}:
+                    txt.insert(tk.END, " ")
 
 
     except Exception as e:
-        errorLabel = tk.Label(root, text =  f"Error: {e}")
-        errorLabel.pack()
-        #txt.delete("1.0", tk.END)
-        #txt.insert(tk.END,)
+        txt.delete("1.0", tk.END)
+        txt.insert(tk.END, f"Error: {e}")
 
+    #if isHtml: # Don't run mainloop if it's a recursive call
     root.mainloop()
 
 
 # ================== ENTRY ==================
 
 if __name__ == "__main__":
-    exampleHtml = '''
-    <!DOCTYPE html>
-    <html lang="en"><head>
-    <meta http-equiv="content-type" content="text/html; charset=windows-1252"><title>Example Domain</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{background:#eee;width:60vw;margin:15vh auto;font-family:system-ui,sans-serif}h1{font-size:1.5em}div{opacity:0.8}a:link,a:visited{color:#348}</style></head><body><div><h1>Example Domain</h1><p>This domain is for use in documentation examples without needing permission. Avoid use in operations.</p><p><a href="https://iana.org/domains/example">Learn more</a></p></div>"""
-    </body></(html>
-    '''
     #browse(exampleHtml,isHtml=True)
     browse("https://example.com")
