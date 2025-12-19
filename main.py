@@ -637,7 +637,7 @@ def browse(url, root = None, isHtml = False):
                             if link_url:
                                 label.config(fg="blue", cursor="hand2", underline=True)
                                 def make_callback(url_to_open):
-                                    return lambda e: browse(createAbsoluteURL(url,url_to_open), root)
+                                    return lambda e: searchAndStack(createAbsoluteURL(url,url_to_open), root)
                                 label.bind("<Button-1>", make_callback(link_url))
 
 
@@ -658,27 +658,27 @@ def browse(url, root = None, isHtml = False):
 class SearchStack:
     def __init__(self):
         self.stack = []
-        self.index = 0
+        self.index = -1
 
     def push(self, item):
-        self.stack.insert(self.index,item)
+        if self.index < len(self.stack) - 1:
+            self.stack = self.stack[:self.index+1]
+        self.stack.append(item)
         self.index += 1
 
-    def pop(self):
-        if self.index > 0:
-            self.index -= 1
-            return self.stack.pop(self.index)
-        return None
     def back(self):
         if self.index > 0:
             self.index -= 1
+        if self.index >= 0 and self.stack:
             return self.stack[self.index]
-        return self.stack[0]
+        return None
+
     def forward(self):
-        if self.index < len(self.stack):
+        if self.index < len(self.stack) - 1:
             self.index += 1
+        if self.index >= 0 and self.stack:
             return self.stack[self.index]
-        return self.stack[-1]
+        return None
 
 
 
@@ -703,10 +703,14 @@ def createAbsoluteURL(url, givenUrl):
 
 def previousSearch(root):
     print(searchHistory.stack)
-    browse(searchHistory.back(),root)
+    url = searchHistory.back()
+    if url:
+        browse(url,root)
 def nextSearch(root):
     print(searchHistory.stack)
-    browse(searchHistory.forward(),root)
+    url = searchHistory.forward()
+    if url:
+        browse(url,root)
 def searchAndStack(url,root):
 
     searchHistory.push(url)
