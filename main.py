@@ -26,7 +26,7 @@ class HTMLCollection():
         if element_id is None:
             element_id = len(self.elements) + 1
         self.elements.append(HTMLElement(element_type, element_data, id=element_id, tags=tags))
-        return element_id
+        return self.elements[-1]
 
 
 # ================== CUSTOM WIDGETS ==================
@@ -221,7 +221,7 @@ class SimpleJSInterpreter:
                     if m.group(3) == "innerText":
                         print(element)
                         if element is not None:
-                            text = m.split(",",1)
+                            text = line.split(",",1)
                             print(text)
                             element.JSOveride["innerText"] =text
                             element.boundObject.configure(text=text[1])
@@ -323,7 +323,9 @@ class AdvancedCSSRenderer(HTMLParser):
         self.tag_styles[style_tag_name] = styles
         
         # Push the tag, its attributes, and its generated style name to the stack
-        self.tag_stack.append((tag, attrs, style_tag_name))
+        current_element = self.htmlCollection.addObject(tag, {"attrs": attrs}, tags=[style_tag_name], element_id=attrs.get("id"))
+        self.tag_stack.append((tag, attrs, style_tag_name, current_element))
+
 
     def handle_endtag(self, tag):
         if tag == "style":
@@ -334,7 +336,7 @@ class AdvancedCSSRenderer(HTMLParser):
 
         if tag == "script":
             self.in_script = False
-            self.js.run(self.script_buffer, [s for _, _, s in self.tag_stack])
+            self.js.run(self.script_buffer, [s for _, _, s, _ in self.tag_stack])
             self.script_buffer = ""
             return
 
@@ -342,7 +344,7 @@ class AdvancedCSSRenderer(HTMLParser):
             self.tag_stack.pop()
             # Add an end marker for block-level elements to handle newlines
             if tag in {"p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "li", "button"}:
-                print(self.tag_stack,tag)
+
                 self.htmlCollection.addObject(f"end_{tag}")
 
 
@@ -353,11 +355,15 @@ class AdvancedCSSRenderer(HTMLParser):
             self.script_buffer += data
         elif self.tag_stack:
             # Get current tag info from the top of the stack
-            tag, attrs, _ = self.tag_stack[-1]
+            tag, attrs, _, element = self.tag_stack[-1]
             # Get all styles from the stack to handle nesting
-            style_tags = [s for _, _, s in self.tag_stack]
-            #print(attrs)
-            self.htmlCollection.addObject(tag, {"content": data.strip(), "attrs": attrs}, tags=style_tags,element_id=attrs.get("id",None))
+            style_tags = [s for _, _, s, _ in self.tag_stack]
+            
+            if data.strip():
+                if not element.data.get("content"):
+                    element.data["content"] = ""
+                element.data["content"] += data.strip()
+
 
     # ---------- CSS ----------
     def parse_global_css(self, css):
