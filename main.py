@@ -155,8 +155,13 @@ class AdvancedCSSRenderer(HTMLParser):
         self.htmlCollection = HTMLCollection()
         self.js = SimpleJSInterpreter(self.htmlCollection)
 
+        self.tag = ""
+
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+
+        print(tag)
+        self.tag = tag
 
         if tag == "style":
             self.in_style = True
@@ -206,7 +211,9 @@ class AdvancedCSSRenderer(HTMLParser):
         elif self.in_script:
             self.script_buffer += data
         else:
-            self.htmlCollection.addObject("text", {"content": data}, tags=list(self.tag_stack))
+            print(data)
+
+            self.htmlCollection.addObject(self.tag, {"content": data}, tags=list(self.tag_stack))
 
     # ---------- CSS ----------
     def parse_global_css(self, css):
@@ -238,8 +245,8 @@ def browse(url):
     root = tk.Tk()
     root.title("Python Mini Browser")
 
-    txt = tk.Text(root, wrap="word")
-    txt.pack(expand=True, fill="both")
+    #txt = tk.Text(root, wrap="word")
+    #txt.pack(expand=True, fill="both")
 
     try:
         with urllib.request.urlopen(url) as r:
@@ -249,22 +256,39 @@ def browse(url):
         cssrenderer.feed(html)
 
         for name, props in cssrenderer.tag_styles.items():
+            continue
             txt.tag_configure(
                 name,
                 foreground=props.get("foreground", "black"),
                 background=props.get("background", "white"),
                 font=("Arial", props.get("size", 10), props.get("weight", "normal")),
             )
-
+        tkObjects = []
+        typeRemap = {"p":"text","h1":"text","h2":"text","h3":"text","h4":"text","h5":"text","h6":"text","a":"link"}
         for element in cssrenderer.htmlCollection.elements:
-            if element.type == "text":
-                txt.insert(tk.END, element.data.get("content", ""), element.tags)
+            
+            remmapedType = None
+            if element.type in typeRemap:
+                remmapedType = typeRemap[element.type]
+
+            if "text" in [element.type,remmapedType]:
+
+                text = element.data.get("content", "")
+
+                print(element.data)
+                
+                txtTemp = tk.Label(root, text = text)
+                txtTemp.pack(expand=False)
+                #txtTemp.insert(tk.END, , element.tags)
+                tkObjects.append(txtTemp)
             elif element.type == "br":
                 txt.insert(tk.END, "\n", element.tags)
 
     except Exception as e:
-        txt.delete("1.0", tk.END)
-        txt.insert(tk.END, f"Error: {e}")
+        errorLabel = tk.Label(root, text =  f"Error: {e}")
+        errorLabel.pack()
+        #txt.delete("1.0", tk.END)
+        #txt.insert(tk.END,)
 
     root.mainloop()
 
