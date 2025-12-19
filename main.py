@@ -18,7 +18,7 @@ class HTMLCollection():
         self.elements = []
     def addObject(self,element_type,element_data = {}):
         element_id = len(self.elements)+1
-        self.elements.append(HTMLElement(element_type,element_data),id = element_id)
+        self.elements.append(HTMLElement(element_type,element_data,id = element_id))
         return element_id
 
 
@@ -207,7 +207,7 @@ class AdvancedCSSRenderer(HTMLParser):
         elif self.in_script:
             self.script_buffer += data
         else:
-            self.text.insert(tk.END, data, tuple(self.tag_stack))
+            self.htmlCollection.addObject("text", {"content": data})
 
     # ---------- CSS ----------
     def parse_global_css(self, css):
