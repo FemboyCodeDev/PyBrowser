@@ -271,18 +271,33 @@ def browse(url):
             if element.type in typeRemap:
                 remmapedType = typeRemap[element.type]
 
+
+            if element.type == "title":
+                root.title(element.data.get("content", ""))
+
             if "text" in [element.type,remmapedType]:
+
+                fontSizes = {"p":16,"h1":32,"h2":24,"h3":20,"h4":18,"h5":16,"h6":14}
+
 
                 text = element.data.get("content", "")
 
                 print(element.data)
                 
-                txtTemp = tk.Label(root, text = text)
+                txtTemp = tk.Label(root, text = text, font=("Helvetica", fontSizes[element.type]))
                 txtTemp.pack(expand=False)
                 #txtTemp.insert(tk.END, , element.tags)
                 tkObjects.append(txtTemp)
+            if "link" in [element.type, remmapedType]:
+                text = element.data.get("content","")
+
+                labelTemp = tk.Button(root,text = text)
+                labelTemp.pack()
+                tkObjects.append(labelTemp)
+
             elif element.type == "br":
                 txt.insert(tk.END, "\n", element.tags)
+
 
     except Exception as e:
         errorLabel = tk.Label(root, text =  f"Error: {e}")
