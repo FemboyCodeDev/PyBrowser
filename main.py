@@ -239,6 +239,17 @@ class AdvancedCSSRenderer(HTMLParser):
                 size = re.sub(r"\D", "", v)
                 if size:
                     props["size"] = int(size)
+            elif k == "font-family":
+                rawdata = v.split(",")
+                font = rawdata.pop(0)
+                if font[0] == "'" and font[-1] == "'":
+                    font = font[1:-1]
+                elif font[0] == '"' and font[-1] == '"':
+                    font = font[1:-1]
+                data = [font,rawdata]
+                props["font-family"] = data
+            else:
+                props[k] = v
         return props
 
 
@@ -274,6 +285,7 @@ def browse(url, root = None, isHtml = False):
         inline_container.pack(fill="x", anchor="w")
 
         block_elements = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "li"}
+        text_elements_size = {"h1": 24, "h2": 20, "h3": 18, "h4": 16, "h5": 14, "h6": 12, "p": 10}
         
         for element in cssrenderer.htmlCollection.elements:
             if element.type == "title" and element.data.get("content"):
@@ -298,8 +310,11 @@ def browse(url, root = None, isHtml = False):
                             style.update(cssrenderer.tag_styles[tag_name])
 
                 font_family = "Arial" # Hardcoded for now
+                font_family = style.get("font-family", [font_family])[0]
+                print(font_family)
+                print(style)
                 font_weight = style.get("weight", "normal")
-                font_size = style.get("size", 12)
+                font_size = style.get("size", text_elements_size.get(element.type, 12))
                 
                 widget_config = {
                     "text": content,
@@ -370,7 +385,7 @@ if __name__ == "__main__":
 
     root.geometry("800x600")
 
-    browse("https://femboycodedev.github.io/htmlTest.github.io/",root)
+    browse("https://femboycodedev.github.io/htmlTest.github.io/linkTest",root)
 
     root.mainloop()
     #browse("https://example.com")
