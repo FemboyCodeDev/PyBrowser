@@ -640,8 +640,13 @@ def browse(url, root = None, isHtml = False):
                                     return lambda e: browse(createAbsoluteURL(url,url_to_open), root)
                                 label.bind("<Button-1>", make_callback(link_url))
 
+
+
                         element.boundObject = label
-                        label.pack(side="left", anchor="nw")
+                        side = style.get("text-align","left")
+                        print(style)
+                        print(side)
+                        label.pack(side=side, anchor="nw")
             except Exception as e:
                 tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
 
@@ -693,7 +698,8 @@ if __name__ == "__main__":
     root.geometry("800x600")
     url = "https://femboycodedev.github.io/htmlTest.github.io/linkTest"
     url = "https://femboycodedev.github.io/htmlTest.github.io/jsTest1"
-    browse(url,root)
+    url = "https://femboycodedev.github.io/htmlTest.github.io/align1"
+    #browse(url,root)
 
     root.mainloop()
     #browse("https://example.com")
