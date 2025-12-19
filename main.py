@@ -483,7 +483,7 @@ def browse(url, root = None, isHtml = False):
     try:
         if not isHtml:
             req = urllib.request.Request(url)
-            req.add_header("User-Agent","Spifftech/1.0 PyBrowse/1")
+            req.add_header("User-Agent","Spifftech/1.0 PyBrowser/1")
             with urllib.request.urlopen(req) as r:
                 html = r.read().decode("utf-8", errors="ignore")
         else:
