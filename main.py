@@ -264,7 +264,7 @@ class AdvancedCSSRenderer(HTMLParser):
         if self.tag_stack and self.tag_stack[-1][0] == tag:
             self.tag_stack.pop()
             # Add an end marker for block-level elements to handle newlines
-            if tag in {"p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "li"}:
+            if tag in {"p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "li", "button"}:
                 self.htmlCollection.addObject(f"end_{tag}")
 
 
@@ -363,6 +363,7 @@ def browse(url, root = None, isHtml = False):
         text_elements_size = {"h1": 24, "h2": 20, "h3": 18, "h4": 16, "h5": 14, "h6": 12, "p": 10}
         
         for element in cssrenderer.htmlCollection.elements:
+            print(element.type,element.data)
             if element.type == "title" and element.data.get("content"):
                 root.title(element.data["content"])
 
@@ -414,20 +415,26 @@ def browse(url, root = None, isHtml = False):
                 
                 widget_config = {k: v for k, v in widget_config.items() if v is not None}
 
-                label = TransparentLabel(inline_container, **widget_config)
+                if element.type == "button":
+                    button = tk.Button(inline_container, **widget_config)
+                    onclick = element.data.get("attrs", {}).get("onclick")
+                    if onclick:
+                        def make_callback(js_code):
+                            return lambda: cssrenderer.js.run(js_code)
+                        button.config(command=make_callback(onclick))
+                    button.pack(side="left", anchor="nw")
+                else:
+                    label = TransparentLabel(inline_container, **widget_config)
+                    if element.type == "a":
+                        link_url = element.data.get("attrs", {}).get("href")
+                        if link_url:
+                            label.config(fg="blue", cursor="hand2", underline=True)
+                            
+                            def make_callback(url_to_open):
+                                return lambda e: browse(createAbsoluteURL(url,url_to_open), root)
+                            label.bind("<Button-1>", make_callback(link_url))
+                    label.pack(side="left", anchor="nw")
 
-
-                
-                if element.type == "a":
-                    link_url = element.data.get("attrs", {}).get("href")
-                    if link_url:
-                        label.config(fg="blue", cursor="hand2", underline=True)
-                        
-                        def make_callback(url_to_open):
-                            return lambda e: browse(createAbsoluteURL(url,url_to_open), root)
-                        label.bind("<Button-1>", make_callback(link_url))
-
-                label.pack(side="left", anchor="nw")
 
     except Exception as e:
         tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
@@ -472,8 +479,9 @@ if __name__ == "__main__":
 
 
     root.geometry("800x600")
-
-    browse("https://femboycodedev.github.io/htmlTest.github.io/linkTest",root)
+    url = "https://femboycodedev.github.io/htmlTest.github.io/linkTest"
+    url = "https://femboycodedev.github.io/htmlTest.github.io/jsTest1"
+    browse(url,root)
 
     root.mainloop()
     #browse("https://example.com")
