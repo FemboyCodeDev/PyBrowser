@@ -331,7 +331,7 @@ class AdvancedCSSRenderer(HTMLParser):
                 elif font[0] == '"' and font[-1] == '"':
                     font = font[1:-1]
                 data = [font]+rawdata
-                print(v,font)
+                #print(v,font)
                 props["font-family"] = data
             else:
                 props[k] = v
@@ -373,7 +373,7 @@ def browse(url, root = None, isHtml = False):
         text_elements_size = {"h1": 24, "h2": 20, "h3": 18, "h4": 16, "h5": 14, "h6": 12, "p": 10}
         
         for element in cssrenderer.htmlCollection.elements:
-            print(element.type,element.data)
+            #print(element.type,element.data)
             if element.type == "title" and element.data.get("content"):
                 root.title(element.data["content"])
 
@@ -397,8 +397,8 @@ def browse(url, root = None, isHtml = False):
 
                 font_family = "Arial" # Hardcoded for now
                 font_family = style.get("font-family", [font_family])[0]
-                print(font_family)
-                print(style)
+                #print(font_family)
+                #print(style)
                 font_weight = style.get("weight", "normal")
                 font_size = style.get("size", text_elements_size.get(element.type, 12))
 
@@ -456,10 +456,10 @@ def GetBasisURL(url):
     prefix = ""
     if segments[0] in ["https:","http:"]:
         prefix = segments.pop(0)
-    print(segments)
+    #print(segments)
     return prefix+"//"+segments[0]
 def createAbsoluteURL(url, givenUrl):
-    print(url,givenUrl)
+    #print(url,givenUrl)
     if givenUrl.startswith("https://") or givenUrl.startswith("http://"):
         return givenUrl
     elif givenUrl.startswith("/"):
