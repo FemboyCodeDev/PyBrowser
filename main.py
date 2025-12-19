@@ -251,13 +251,15 @@ class AdvancedCSSRenderer(HTMLParser):
                 if size:
                     props["size"] = int(size)
             elif k == "font-family":
+                k, v = [x.strip() for x in item.split(":", 1)]
                 rawdata = v.split(",")
                 font = rawdata.pop(0)
                 if font[0] == "'" and font[-1] == "'":
                     font = font[1:-1]
                 elif font[0] == '"' and font[-1] == '"':
                     font = font[1:-1]
-                data = [font,rawdata]
+                data = [font]+rawdata
+                print(v,font)
                 props["font-family"] = data
             else:
                 props[k] = v
