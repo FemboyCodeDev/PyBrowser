@@ -237,9 +237,12 @@ class SimpleJSInterpreter:
                         print(element)
                         if element is not None:
                             text = line.split("=",1)
+                            text = text[1]
+                            print(text)
+                            text  = self.eval_value(text)
                             print(text)
                             element.JSOveride["innerText"] =text
-                            element.boundObject.configure(text_content=text[1])
+                            element.boundObject.configure(text_content=text)
                             #element.boundObject.configure(text="test")
 
                         i+=1
@@ -254,7 +257,7 @@ class SimpleJSInterpreter:
 
     def eval_value(self, val):
         val = val.strip()
-        if val.startswith(("'", '"')):
+        if val.startswith(("'", '"')) and val.endswith(("'", '"')):
             return val[1:-1]
         if val.isdigit():
             return int(val)
@@ -262,6 +265,31 @@ class SimpleJSInterpreter:
             return True
         if val == "false":
             return False
+        else:
+            if True in [x in val for x in list("+-/*")]:
+                #Replace variables
+                if True in [x in val for x in ["'", '"']]:
+                    operationType = "string"
+                else:
+                    operationType = "number"
+                for var_name, var_value in self.vars.items():
+                    #Determine the type of operation
+
+                    if operationType == "string":
+                        var_value = f"str({var_value})"
+                    elif operationType == "number":
+                        var_value = f"{var_value}"
+                    val = val.replace(var_name, str(var_value))
+
+
+
+                print(val)
+                try:
+                    return eval(val)
+                except Exception as e:
+                    print(e)
+                    return val
+
         return self.vars.get(val, "")
 
     def eval_condition(self, cond):
