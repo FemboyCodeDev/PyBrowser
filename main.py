@@ -4,6 +4,7 @@ import tkinter.font
 import tkinter.messagebox
 from html.parser import HTMLParser
 import re
+import base64
 
 # Core modules
 
@@ -350,6 +351,12 @@ class AdvancedCSSRenderer(HTMLParser):
             self.in_script = True
             return
 
+        if tag == "img":
+            src = attrs.get("src")
+            if src:
+                self.htmlCollection.addObject("image", {"src": src}, element_id=attrs.get("id"))
+            return
+
         if tag == "br":
             self.htmlCollection.addObject("br")
             return
@@ -475,7 +482,9 @@ def browse(url, root = None, isHtml = False):
 
     try:
         if not isHtml:
-            with urllib.request.urlopen(url) as r:
+            req = urllib.request.Request(url)
+            req.add_header("User-Agent","Spifftech/1.0 PyBrowse/1")
+            with urllib.request.urlopen(req) as r:
                 html = r.read().decode("utf-8", errors="ignore")
         else:
             html = url
@@ -504,6 +513,31 @@ def browse(url, root = None, isHtml = False):
                 elif element.type == "br":
                     inline_container = tk.Frame(content_frame)
                     inline_container.pack(fill="x", anchor="w")
+
+                elif element.type == "image":
+
+                    try:
+                        src = element.data.get("src")
+                        if src and False:
+                            image_url = createAbsoluteURL(url, src)
+                            print(image_url)
+                            #with urllib.request.urlopen(image_url) as r:
+                            #
+                            #    image_data = r.read()
+                            
+                            image_b64 = base64.b64encode(image_data)
+                            image = tk.PhotoImage(data=image_b64)
+                            
+                            label = tk.Label(inline_container, image=image)
+                            label.image = image # Keep a reference!
+                            label.pack(side="left", anchor="nw")
+                            element.boundObject = label
+                    except Exception as e:
+                        # tk.PhotoImage can fail if the image format is not supported (e.g., JPEG, PNG)
+                        # It primarily supports GIF and PGM/PPM.
+                        print(f"Error loading image {src}: {e}")
+                        error_label = tk.Label(inline_container, text=f"[Image: {src},{e}]", fg="red")
+                        error_label.pack(side="left", anchor="nw")
 
                 elif element.data.get("content") or element.data.get("attrs",{}).get("id"):
                     content = element.data.get("content","None")
