@@ -328,4 +328,21 @@ def browse(url, root = None, isHtml = False):
 
 if __name__ == "__main__":
     #browse(exampleHtml,isHtml=True)
-    browse("https://example.com")
+    root = tk.Tk()
+
+
+
+
+    root.geometry("800x600")
+
+    top_frame = tk.Frame(root)
+    top_frame.pack(fill="x")
+
+    urlSelect = tk.Entry(root)
+    urlSelect.pack(in_=top_frame, side="left", fill="x", expand=True)
+    searchButton = tk.Button(root,text="Search",command=lambda: browse(urlSelect.get(), root) )
+    searchButton.pack(in_=top_frame, side="right")
+
+
+    root.mainloop()
+    #browse("https://example.com")
