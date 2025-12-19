@@ -5,7 +5,7 @@ import tkinter.messagebox
 from html.parser import HTMLParser
 import re
 import base64
-
+import sys
 # Core modules
 
 class HTMLElement():
@@ -105,6 +105,48 @@ class TransparentLabel(tk.Canvas):
 
     def configure(self, **kwargs):
         self.config(**kwargs)
+
+# ================== DEBUG CONSOLE ================
+
+class ConsoleObject:
+    def __init__(self, text = "",sep = ","):
+        self.text = text
+        self.sep = sep
+        self.end = "\n"
+        self.type = "info"
+        self.logged = False
+    def setLogged(self):
+        self.logged = True
+
+
+class _Console:
+    def __init__(self):
+        self.log = []
+    def print(self, *args, sep=' ', end='\n', file=None,type = "info",flush = True):
+
+        text = sep.join([str(arg) for arg in args])
+        obj = ConsoleObject(text=text,sep=sep)
+        obj.type = type
+        self.log.append(obj)
+        if flush:
+            Console.render()
+
+        #print(text, end=end, file=file)
+    def render(self):
+        #Use sys.stdout
+        output,_ = [(obj.text + obj.end,obj.type) if not obj.logged else ("",None) for obj in self.log], [obj.setLogged() for obj in self.log]
+        [sys.stdout.write(obj[0]) if obj[1] == "info" else sys.stderr.write(obj[0]) for obj in output]
+
+
+
+Console = _Console()
+print = Console.print
+#print("test1")
+#print("test2")
+#print("test2",type = "error")
+
+
+
 
 # ================== SIMPLE JAVASCRIPT INTERPRETER ==================
 
@@ -253,7 +295,7 @@ class SimpleJSInterpreter:
                     #
 
 
-            print("JS error:", line)
+            print("JS error:", line,type="error")
             i += 1
 
     def eval_value(self, val):
@@ -288,7 +330,7 @@ class SimpleJSInterpreter:
                 try:
                     return eval(val)
                 except Exception as e:
-                    print(e)
+                    print(e,type = "error")
                     return val
 
         return self.vars.get(val, "")
@@ -646,6 +688,7 @@ def browse(url, root = None, isHtml = False):
                         side = style.get("text-align","left")
                         label.pack(side=side, anchor="nw")
             except Exception as e:
+                print(e,type = "error")
                 tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
 
 
