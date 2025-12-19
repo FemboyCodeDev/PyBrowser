@@ -3,6 +3,25 @@ import tkinter as tk
 from html.parser import HTMLParser
 import re
 
+# Core modules
+
+class HTMLElement():
+    def __init__(self,element_type,element_data = {},id = None):
+        self.type = element_type
+        self.data = element_data
+        self.id = id
+
+
+
+class HTMLCollection():
+    def __init__(self):
+        self.elements = []
+    def addObject(self,element_type,element_data = {}):
+        element_id = len(self.elements)+1
+        self.elements.append(HTMLElement(element_type,element_data),id = element_id)
+        return element_id
+
+
 
 # ================== SIMPLE JAVASCRIPT INTERPRETER ==================
 
@@ -133,6 +152,8 @@ class AdvancedCSSRenderer(HTMLParser):
 
         self.js = SimpleJSInterpreter(text_widget)
 
+        self.htmlCollection = HTMLCollection()
+
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
 
@@ -147,7 +168,9 @@ class AdvancedCSSRenderer(HTMLParser):
             return
 
         if tag == "br":
-            self.text.insert(tk.END, "\n")
+
+            #self.text.insert(tk.END, "\n")
+            self.htmlCollection.addObject("br")
             return
 
         styles = {}
