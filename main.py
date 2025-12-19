@@ -1,5 +1,6 @@
 import urllib.request
 import tkinter as tk
+import tkinter.font
 from html.parser import HTMLParser
 import re
 
@@ -22,6 +23,67 @@ class HTMLCollection():
         self.elements.append(HTMLElement(element_type, element_data, id=element_id, tags=tags))
         return element_id
 
+
+# ================== CUSTOM WIDGETS ==================
+
+class TransparentLabel(tk.Canvas):
+    def __init__(self, master=None, **kwargs):
+        text = kwargs.pop("text", "")
+        font_tuple = kwargs.pop("font", ("Arial", 12))
+        fg = kwargs.pop("fg", "black")
+        underline = kwargs.pop("underline", False)
+
+        if "bg" not in kwargs and "background" not in kwargs:
+            if master:
+                kwargs["bg"] = master.cget("bg")
+
+        family = font_tuple[0]
+        size = font_tuple[1]
+        weight = "normal"
+        if len(font_tuple) > 2:
+            weight = font_tuple[2]
+
+        self.font = tkinter.font.Font(family=family, size=size, weight=weight, underline=underline)
+
+        width = self.font.measure(text)
+        height = self.font.metrics("linespace")
+
+        super().__init__(master, width=width, height=height, **kwargs)
+
+        self.text_id = self.create_text(0, 0, text=text, font=self.font, fill=fg, anchor="nw")
+        self.config(highlightthickness=0)
+        self.text_content = text
+
+    def config(self, **kwargs):
+        if 'fg' in kwargs:
+            self.itemconfig(self.text_id, fill=kwargs.pop('fg'))
+
+        font_updated = False
+        if 'underline' in kwargs:
+            self.font.config(underline=kwargs.pop('underline'))
+            font_updated = True
+
+        if 'font' in kwargs:
+            font_tuple = kwargs.pop('font')
+            family = font_tuple[0]
+            size = font_tuple[1]
+            weight = "normal"
+            if len(font_tuple) > 2:
+                weight = font_tuple[2]
+            self.font.config(family=family, size=size, weight=weight)
+
+            width = self.font.measure(self.text_content)
+            height = self.font.metrics("linespace")
+            super().config(width=width, height=height)
+            font_updated = True
+
+        if font_updated:
+            self.itemconfig(self.text_id, font=self.font)
+
+        super().config(**kwargs)
+
+    def configure(self, **kwargs):
+        self.config(**kwargs)
 
 # ================== SIMPLE JAVASCRIPT INTERPRETER ==================
 
@@ -328,25 +390,38 @@ def browse(url, root = None, isHtml = False):
                 print(style)
                 font_weight = style.get("weight", "normal")
                 font_size = style.get("size", text_elements_size.get(element.type, 12))
-                
+
+                text_transform = style.get("text-transform", "none")
+
+                if text_transform == "uppercase":
+                    content = content.upper()
+
+                elif text_transform == "lowercase":
+                    content = content.lower()
+
+                elif text_transform == "capitalize":
+                    content = content.capitalize()
+
+                elif text_transform == "none":
+                    pass
+
                 widget_config = {
                     "text": content,
                     "font": (font_family, font_size, font_weight),
                     "fg": style.get("foreground", "black"),
-                    "bg": style.get("background", "white"),
-                    "wraplength": 800 # Fixed wraplength
+                    "bg": style.get("background"),
                 }
+                
+                widget_config = {k: v for k, v in widget_config.items() if v is not None}
 
-                label = tk.Label(inline_container, **widget_config)
+                label = TransparentLabel(inline_container, **widget_config)
+
+
                 
                 if element.type == "a":
                     link_url = element.data.get("attrs", {}).get("href")
                     if link_url:
-                        label.config(fg="blue", cursor="hand2")
-                        current_font = widget_config["font"]
-                        # Add underline to font weight
-                        new_weight = f"{current_font[2]} underline"
-                        label.config(font=(current_font[0], current_font[1], new_weight))
+                        label.config(fg="blue", cursor="hand2", underline=True)
                         
                         def make_callback(url_to_open):
                             return lambda e: browse(createAbsoluteURL(url,url_to_open), root)
