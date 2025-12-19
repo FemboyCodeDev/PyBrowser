@@ -321,13 +321,31 @@ def browse(url, root = None, isHtml = False):
                         label.config(font=(current_font[0], current_font[1], new_weight))
                         
                         def make_callback(url_to_open):
-                            return lambda e: browse(url_to_open, root)
+                            return lambda e: browse(createAbsoluteURL(url,url_to_open), root)
                         label.bind("<Button-1>", make_callback(link_url))
 
                 label.pack(side="left", anchor="nw")
 
     except Exception as e:
         tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
+
+def GetBasisURL(url):
+    segments = url.split("/")
+    #Remove empty parts of list
+    segments = [segment for segment in segments if segment]
+    prefix = ""
+    if segments[0] in ["https:","http:"]:
+        prefix = segments.pop(0)
+    print(segments)
+    return prefix+"//"+segments[0]
+def createAbsoluteURL(url, givenUrl):
+    print(url,givenUrl)
+    if givenUrl.startswith("https://") or givenUrl.startswith("http://"):
+        return givenUrl
+    elif givenUrl.startswith("/"):
+        return GetBasisURL(url) + givenUrl
+    else:
+        return url + "/" + givenUrl
 
 
 def createSearchBar(root,url = ""):
@@ -344,12 +362,15 @@ def createSearchBar(root,url = ""):
 
 if __name__ == "__main__":
     #browse(exampleHtml,isHtml=True)
+    GetBasisURL("https://femboycodedev.github.io/htmlTest.github.io/linkTest")
     root = tk.Tk()
 
     createSearchBar(root)
 
 
     root.geometry("800x600")
+
+    browse("https://femboycodedev.github.io/htmlTest.github.io/",root)
 
     root.mainloop()
     #browse("https://example.com")
