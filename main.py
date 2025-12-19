@@ -156,12 +156,15 @@ class AdvancedCSSRenderer(HTMLParser):
         self.js = SimpleJSInterpreter(self.htmlCollection)
 
         self.tag = ""
+        self.attrs = {}
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
 
         print(tag)
         self.tag = tag
+        print(attrs)
+        self.attrs = attrs
 
         if tag == "style":
             self.in_style = True
@@ -213,7 +216,7 @@ class AdvancedCSSRenderer(HTMLParser):
         else:
             print(data)
 
-            self.htmlCollection.addObject(self.tag, {"content": data}, tags=list(self.tag_stack))
+            self.htmlCollection.addObject(self.tag, {"content": data,"attrs":self.attrs}, tags=list(self.tag_stack))
 
     # ---------- CSS ----------
     def parse_global_css(self, css):
@@ -241,17 +244,23 @@ class AdvancedCSSRenderer(HTMLParser):
 
 # ================== BROWSER ==================
 
-def browse(url):
-    root = tk.Tk()
+def browse(url, root = None, isHtml = False):
+    if root == None:
+        root = tk.Tk()
+    
     root.title("Python Mini Browser")
 
     #txt = tk.Text(root, wrap="word")
     #txt.pack(expand=True, fill="both")
 
     try:
-        with urllib.request.urlopen(url) as r:
-            html = r.read().decode("utf-8", errors="ignore")
-
+        if not isHtml:
+            print("Opening URL")
+            with urllib.request.urlopen(url) as r:
+                html = r.read().decode("utf-8", errors="ignore")
+            print("URL GOT")
+        else:
+            html = url
         cssrenderer = AdvancedCSSRenderer()
         cssrenderer.feed(html)
 
@@ -282,21 +291,39 @@ def browse(url):
 
                 text = element.data.get("content", "")
 
-                print(element.data)
+                #print(element.data)
                 
-                txtTemp = tk.Label(root, text = text, font=("Helvetica", fontSizes[element.type]))
-                txtTemp.pack(expand=False)
+                txtTemp = tk.Label(root, text = text, font=("Helvetica", fontSizes[element.type]),justify="left", anchor="w")
+                txtTemp.pack(expand=False,anchor="w")
+                tkObjects.append(txtTemp)
                 #txtTemp.insert(tk.END, , element.tags)
                 tkObjects.append(txtTemp)
             if "link" in [element.type, remmapedType]:
                 text = element.data.get("content","")
+                attrs = element.data.get("attrs","")
+                #print(attrs)
 
-                labelTemp = tk.Button(root,text = text)
-                labelTemp.pack()
+                link = attrs.get("href","")
+
+                def clearAndBrowse(url,root,objects):
+                    for object in objects:
+                        object.destroy()
+                    browse(url,root)
+
+                
+
+                redirectFunction = lambda: clearAndBrowse(link,root, tkObjects)
+
+                labelTemp = tk.Button(root,text = text, command = redirectFunction)
+                #labelTemp.pack()
+                labelTemp.pack(expand=False,anchor="w")
                 tkObjects.append(labelTemp)
 
             elif element.type == "br":
-                txt.insert(tk.END, "\n", element.tags)
+                labelTemp = tk.Label(root,text = "")
+                labelTemp.pack()
+                tkObjects.append(labelTemp)
+
 
 
     except Exception as e:
@@ -311,4 +338,11 @@ def browse(url):
 # ================== ENTRY ==================
 
 if __name__ == "__main__":
+    exampleHtml = '''
+    <!DOCTYPE html>
+    <html lang="en"><head>
+    <meta http-equiv="content-type" content="text/html; charset=windows-1252"><title>Example Domain</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{background:#eee;width:60vw;margin:15vh auto;font-family:system-ui,sans-serif}h1{font-size:1.5em}div{opacity:0.8}a:link,a:visited{color:#348}</style></head><body><div><h1>Example Domain</h1><p>This domain is for use in documentation examples without needing permission. Avoid use in operations.</p><p><a href="https://iana.org/domains/example">Learn more</a></p></div>"""
+    </body></(html>
+    '''
+    #browse(exampleHtml,isHtml=True)
     browse("https://example.com")
