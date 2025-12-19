@@ -252,7 +252,7 @@ def browse(url, root = None, isHtml = False):
     for widget in root.winfo_children():
         widget.destroy()
 
-    createSearchBar(root)  
+    createSearchBar(root,url)
 
     root.title("Python Mini Browser")
 
@@ -328,11 +328,13 @@ def browse(url, root = None, isHtml = False):
 
 
 
-def createSearchBar(root):
+def createSearchBar(root,url = ""):
     top_frame = tk.Frame(root)
     top_frame.pack(fill="x")
 
     urlSelect = tk.Entry(root)
+    urlSelect.delete(0, tk.END)
+    urlSelect.insert(0,url)
     urlSelect.pack(in_=top_frame, side="left", fill="x", expand=True)
     searchButton = tk.Button(root,text="Search",command=lambda: browse(urlSelect.get(), root) )
     searchButton.pack(in_=top_frame, side="right")
