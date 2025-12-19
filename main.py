@@ -19,8 +19,9 @@ class HTMLCollection():
     def __init__(self):
         self.elements = []
 
-    def addObject(self, element_type, element_data={}, tags=None):
-        element_id = len(self.elements) + 1
+    def addObject(self, element_type, element_data={}, tags=None,element_id=None):
+        if element_id is None:
+            element_id = len(self.elements) + 1
         self.elements.append(HTMLElement(element_type, element_data, id=element_id, tags=tags))
         return element_id
 
@@ -174,6 +175,22 @@ class SimpleJSInterpreter:
                 self.vars[m.group(1)] = self.eval_value(m.group(2))
                 i += 1
                 continue
+            # -------- docuemnt functions -------
+            # for stuff like document.getElementById()
+            m = re.match(r"document\.(\w+)\((.+?)\)", line)
+            if m:
+                #document.getElementById(id)
+                if m.group(1) == "getElementById":
+                    element = None
+                    print(m.group(1),m.group(2))
+                    print(self.html_collection.elements)
+                    for item in self.html_collection.elements:
+                        print(item.id)
+                        if item.id == m.group(2):
+                            element = item
+                            break
+                    #
+
 
             print("JS error:", line)
             i += 1
@@ -296,7 +313,8 @@ class AdvancedCSSRenderer(HTMLParser):
             tag, attrs, _ = self.tag_stack[-1]
             # Get all styles from the stack to handle nesting
             style_tags = [s for _, _, s in self.tag_stack]
-            self.htmlCollection.addObject(tag, {"content": data.strip(), "attrs": attrs}, tags=style_tags)
+            print(attrs)
+            self.htmlCollection.addObject(tag, {"content": data.strip(), "attrs": attrs}, tags=style_tags,element_id=attrs.get("id",None))
 
     # ---------- CSS ----------
     def parse_global_css(self, css):
