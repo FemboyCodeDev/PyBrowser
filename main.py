@@ -84,6 +84,21 @@ class TransparentLabel(tk.Canvas):
 
         if font_updated:
             self.itemconfig(self.text_id, font=self.font)
+        if "text" in kwargs:
+            self.text_content = kwargs.pop('text')
+            self.itemconfig(self.text_id, text=self.text_content)
+            width = self.font.measure(self.text_content)
+            height = self.font.metrics("linespace")
+            super().config(width=width, height=height)
+        if "text_content" in kwargs:
+            self.text_content =kwargs.pop('text_content')
+            self.itemconfig(self.text_id, text=self.text_content)
+            width = self.font.measure(self.text_content)
+            height = self.font.metrics("linespace")
+            super().config(width=width, height=height)
+
+
+
 
         super().config(**kwargs)
 
@@ -221,11 +236,11 @@ class SimpleJSInterpreter:
                     if m.group(3) == "innerText":
                         print(element)
                         if element is not None:
-                            text = line.split(",",1)
+                            text = line.split("=",1)
                             print(text)
                             element.JSOveride["innerText"] =text
-                            element.boundObject.configure(text=text[1])
-                            element.boundObject.configure(text="test")
+                            element.boundObject.configure(text_content=text[1])
+                            #element.boundObject.configure(text="test")
 
                         i+=1
 
@@ -448,7 +463,7 @@ def browse(url, root = None, isHtml = False):
         text_elements_size = {"h1": 24, "h2": 20, "h3": 18, "h4": 16, "h5": 14, "h6": 12, "p": 10}
         
         for element in cssrenderer.htmlCollection.elements:
-            #print(element.type,element.data)
+            print(element.type,element.data)
             if element.type == "title" and element.data.get("content"):
                 root.title(element.data["content"])
 
@@ -461,8 +476,8 @@ def browse(url, root = None, isHtml = False):
                 inline_container = tk.Frame(content_frame)
                 inline_container.pack(fill="x", anchor="w")
 
-            elif element.data.get("content"):
-                content = element.data["content"]
+            elif element.data.get("content") or element.data.get("attrs",{}).get("id"):
+                content = element.data.get("content","None")
                 
                 style = {}
                 if element.tags:
