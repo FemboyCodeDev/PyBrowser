@@ -234,7 +234,18 @@ class AdvancedCSSRenderer(HTMLParser):
             elif k == "background-color":
                 props["background"] = v
             elif k == "font-weight":
-                props["weight"] = v
+                weight = v
+                if weight == "lighter":
+                    weight = "normal"
+                elif weight == "bolder":
+                    weight = "bold"
+                elif weight.isdigit():
+                    weight_val = int(weight)
+                    if weight_val <= 500:
+                        weight = "normal"
+                    else:
+                        weight = "bold"
+                props["weight"] = weight
             elif k == "font-size":
                 size = re.sub(r"\D", "", v)
                 if size:
