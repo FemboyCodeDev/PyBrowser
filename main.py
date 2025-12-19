@@ -233,8 +233,8 @@ class AdvancedCSSRenderer(HTMLParser):
                 props["foreground"] = v
             elif k == "background-color":
                 props["background"] = v
-            elif k == "font-weight" and v == "bold":
-                props["font"] = "bold"
+            elif k == "font-weight":
+                props["weight"] = v
             elif k == "font-size":
                 size = re.sub(r"\D", "", v)
                 if size:
@@ -256,8 +256,8 @@ def browse(url, root = None, isHtml = False):
 
     root.title("Python Mini Browser")
 
-    txt = tk.Text(root, wrap="word", font=("Arial", 12))
-    txt.pack(expand=True, fill="both")
+    content_frame = tk.Frame(root)
+    content_frame.pack(expand=True, fill="both")
 
     try:
         if not isHtml:
@@ -269,20 +269,10 @@ def browse(url, root = None, isHtml = False):
         cssrenderer = AdvancedCSSRenderer()
         cssrenderer.feed(html)
 
-        # Configure all the styles found in the HTML
-        for name, props in cssrenderer.tag_styles.items():
-            font_family = props.get("font", "Arial")
-            font_size = props.get("size", 12)
-            font_weight = props.get("weight", "normal")
-            
-            txt.tag_configure(
-                name,
-                foreground=props.get("foreground", "black"),
-                background=props.get("background", "white"),
-                font=(font_family, font_size, font_weight),
-            )
+        # A frame to hold inline elements for a single "line"
+        inline_container = tk.Frame(content_frame)
+        inline_container.pack(fill="x", anchor="w")
 
-        # Render the elements
         block_elements = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "li"}
         
         for element in cssrenderer.htmlCollection.elements:
@@ -290,42 +280,54 @@ def browse(url, root = None, isHtml = False):
                 root.title(element.data["content"])
 
             elif element.type.startswith("end_") and element.type[4:] in block_elements:
-                txt.insert(tk.END, "\n")
+                # End of a block, start a new line for subsequent elements
+                inline_container = tk.Frame(content_frame)
+                inline_container.pack(fill="x", anchor="w")
 
             elif element.type == "br":
-                txt.insert(tk.END, "\n")
+                inline_container = tk.Frame(content_frame)
+                inline_container.pack(fill="x", anchor="w")
 
             elif element.data.get("content"):
                 content = element.data["content"]
-                tags = element.tags or []
+                
+                style = {}
+                if element.tags:
+                    for tag_name in element.tags:
+                        if tag_name in cssrenderer.tag_styles:
+                            style.update(cssrenderer.tag_styles[tag_name])
+
+                font_family = "Arial" # Hardcoded for now
+                font_weight = style.get("weight", "normal")
+                font_size = style.get("size", 12)
+                
+                widget_config = {
+                    "text": content,
+                    "font": (font_family, font_size, font_weight),
+                    "fg": style.get("foreground", "black"),
+                    "bg": style.get("background", "white"),
+                    "wraplength": 800 # Fixed wraplength
+                }
+
+                label = tk.Label(inline_container, **widget_config)
                 
                 if element.type == "a":
                     link_url = element.data.get("attrs", {}).get("href")
                     if link_url:
-                        link_tag = f"link_{element.id}"
-                        txt.tag_configure(link_tag, foreground="blue", underline=True)
+                        label.config(fg="blue", cursor="hand2")
+                        current_font = widget_config["font"]
+                        # Add underline to font weight
+                        new_weight = f"{current_font[2]} underline"
+                        label.config(font=(current_font[0], current_font[1], new_weight))
                         
-                        # Use a closure to capture the URL for the callback
                         def make_callback(url_to_open):
                             return lambda e: browse(url_to_open, root)
+                        label.bind("<Button-1>", make_callback(link_url))
 
-                        txt.tag_bind(link_tag, "<Button-1>", make_callback(link_url))
-                        tags.append(link_tag)
-
-                txt.insert(tk.END, content, tags)
-                # Add a space for inline elements to ensure separation
-                if element.type in {"a", "span", "strong", "em"}:
-                    txt.insert(tk.END, " ")
-
+                label.pack(side="left", anchor="nw")
 
     except Exception as e:
-        txt.delete("1.0", tk.END)
-        txt.insert(tk.END, f"Error: {e}")
-
-    #if isHtml: # Don't run mainloop if it's a recursive call
-    root.mainloop()
-
-
+        tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
 
 
 def createSearchBar(root,url = ""):
