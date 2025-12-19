@@ -491,98 +491,103 @@ def browse(url, root = None, isHtml = False):
         text_elements_size = {"h1": 24, "h2": 20, "h3": 18, "h4": 16, "h5": 14, "h6": 12, "p": 10}
         
         for element in cssrenderer.htmlCollection.elements:
-            print(element.type,element.data)
-            if element.type == "title" and element.data.get("content"):
-                root.title(element.data["content"])
+            try:
+                print(element.type,element.data)
+                if element.type == "title" and element.data.get("content"):
+                    root.title(element.data["content"])
 
-            elif element.type.startswith("end_") and element.type[4:] in block_elements:
-                # End of a block, start a new line for subsequent elements
-                inline_container = tk.Frame(content_frame)
-                inline_container.pack(fill="x", anchor="w")
+                elif element.type.startswith("end_") and element.type[4:] in block_elements:
+                    # End of a block, start a new line for subsequent elements
+                    inline_container = tk.Frame(content_frame)
+                    inline_container.pack(fill="x", anchor="w")
 
-            elif element.type == "br":
-                inline_container = tk.Frame(content_frame)
-                inline_container.pack(fill="x", anchor="w")
+                elif element.type == "br":
+                    inline_container = tk.Frame(content_frame)
+                    inline_container.pack(fill="x", anchor="w")
 
-            elif element.data.get("content") or element.data.get("attrs",{}).get("id"):
-                content = element.data.get("content","None")
-                
-                style = {}
-                if element.tags:
-                    for tag_name in element.tags:
-                        if tag_name in cssrenderer.tag_styles:
-                            style.update(cssrenderer.tag_styles[tag_name])
+                elif element.data.get("content") or element.data.get("attrs",{}).get("id"):
+                    content = element.data.get("content","None")
 
-                font_family = "Arial" # Hardcoded for now
-                font_family = style.get("font-family", [font_family])[0]
-                #print(font_family)
-                #print(style)
-                font_weight = style.get("weight", "normal")
-                font_size = style.get("size", text_elements_size.get(element.type, 12))
+                    style = {}
+                    if element.tags:
+                        for tag_name in element.tags:
+                            if tag_name in cssrenderer.tag_styles:
+                                style.update(cssrenderer.tag_styles[tag_name])
 
-                text_transform = style.get("text-transform", "none")
+                    font_family = "Arial" # Hardcoded for now
+                    font_family = style.get("font-family", [font_family])[0]
+                    #print(font_family)
+                    #print(style)
+                    font_weight = style.get("weight", "normal")
+                    font_size = style.get("size", text_elements_size.get(element.type, 12))
 
-                if text_transform == "uppercase":
-                    content = content.upper()
+                    text_transform = style.get("text-transform", "none")
 
-                elif text_transform == "lowercase":
-                    content = content.lower()
+                    if text_transform == "uppercase":
+                        content = content.upper()
 
-                elif text_transform == "capitalize":
-                    content = content.capitalize()
+                    elif text_transform == "lowercase":
+                        content = content.lower()
 
-                elif text_transform == "none":
-                    pass
+                    elif text_transform == "capitalize":
+                        content = content.capitalize()
 
-                widget_config = {
-                    "text": content,
-                    "font": (font_family, font_size, font_weight),
-                    "fg": style.get("foreground", "black"),
-                    "bg": style.get("background"),
-                }
-                
-                widget_config = {k: v for k, v in widget_config.items() if v is not None}
+                    elif text_transform == "none":
+                        pass
 
-                if element.type == "button":
-                    button = tk.Button(inline_container, **widget_config)
+                    widget_config = {
+                        "text": content,
+                        "font": (font_family, font_size, font_weight),
+                        "fg": style.get("foreground", "black"),
+                        "bg": style.get("background"),
+                    }
 
-                    onclick_js = element.data.get("attrs", {}).get("onclick")
-                    if element.onclick:
-                        onclick_js = element.onclick
+                    widget_config = {k: v for k, v in widget_config.items() if v is not None}
 
-                    if onclick_js:
-                        def make_callback(js_code):
-                            return lambda: cssrenderer.js.run(js_code)
-                        button.config(command=make_callback(onclick_js))
+                    if element.type == "button":
+                        button = tk.Button(inline_container, **widget_config)
 
-                    element.boundObject = button
-                    button.pack(side="left", anchor="nw")
-                else:
-                    label = TransparentLabel(inline_container, **widget_config)
+                        onclick_js = element.data.get("attrs", {}).get("onclick")
+                        if element.onclick:
+                            onclick_js = element.onclick
 
-                    onclick_js = element.data.get("attrs", {}).get("onclick")
-                    if element.onclick:
-                        onclick_js = element.onclick
+                        if onclick_js:
+                            def make_callback(js_code):
+                                return lambda: cssrenderer.js.run(js_code)
+                            button.config(command=make_callback(onclick_js))
 
-                    if onclick_js:
-                        label.config(cursor="hand2")
-                        def make_callback(js_code):
-                            return lambda e: cssrenderer.js.run(js_code)
-                        label.bind("<Button-1>", make_callback(onclick_js))
-                    elif element.type == "a":
-                        link_url = element.data.get("attrs", {}).get("href")
-                        if link_url:
-                            label.config(fg="blue", cursor="hand2", underline=True)
-                            def make_callback(url_to_open):
-                                return lambda e: browse(createAbsoluteURL(url,url_to_open), root)
-                            label.bind("<Button-1>", make_callback(link_url))
+                        element.boundObject = button
+                        button.pack(side="left", anchor="nw")
+                    else:
+                        label = TransparentLabel(inline_container, **widget_config)
 
-                    element.boundObject = label
-                    label.pack(side="left", anchor="nw")
+                        onclick_js = element.data.get("attrs", {}).get("onclick")
+                        if element.onclick:
+                            onclick_js = element.onclick
+
+                        if onclick_js:
+                            label.config(cursor="hand2")
+                            def make_callback(js_code):
+                                return lambda e: cssrenderer.js.run(js_code)
+                            label.bind("<Button-1>", make_callback(onclick_js))
+                        elif element.type == "a":
+                            link_url = element.data.get("attrs", {}).get("href")
+                            if link_url:
+                                label.config(fg="blue", cursor="hand2", underline=True)
+                                def make_callback(url_to_open):
+                                    return lambda e: browse(createAbsoluteURL(url,url_to_open), root)
+                                label.bind("<Button-1>", make_callback(link_url))
+
+                        element.boundObject = label
+                        label.pack(side="left", anchor="nw")
+            except Exception as e:
+                tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
+
 
 
     except Exception as e:
         tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
+        raise e
 
 def GetBasisURL(url):
     segments = url.split("/")
