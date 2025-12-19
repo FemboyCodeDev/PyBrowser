@@ -95,13 +95,17 @@ class SimpleJSInterpreter:
         self.functions = {}
 
     def run(self, code, tag_stack=None):
+        #print(code)
         if tag_stack is None:
             tag_stack = []
         lines = self.split_statements(code)
+        print(lines)
         i = 0
 
         while i < len(lines):
+
             line = lines[i].strip()
+            #print("JS LINE",line)
             if not line or line.startswith("//"):
                 i += 1
                 continue
@@ -193,20 +197,24 @@ class SimpleJSInterpreter:
         return bool(self.vars.get(cond))
 
     def split_statements(self, code):
-        stmts, buf, depth = [], "", 0
-        for c in code:
-            if c == "{":
-                depth += 1
-            elif c == "}":
-                depth -= 1
-            if c == ";" and depth == 0:
+        all_stmts = []
+        for line in code.splitlines():
+            stmts, buf, depth = [], "", 0
+            for c in line:
+                if c == "{":
+                    depth += 1
+                elif c == "}":
+                    depth -= 1
+                if c == ";" and depth == 0:
+                    if buf.strip():
+                        stmts.append(buf.strip())
+                    buf = ""
+                else:
+                    buf += c
+            if buf.strip():
                 stmts.append(buf.strip())
-                buf = ""
-            else:
-                buf += c
-        if buf.strip():
-            stmts.append(buf.strip())
-        return stmts
+            all_stmts.extend(stmts)
+        return all_stmts
 
 
 # ================== HTML + CSS RENDERER ==================
