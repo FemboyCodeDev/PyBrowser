@@ -214,9 +214,9 @@ class SimpleJSInterpreter:
                         targetId = targetId[1:-1]
                     elif targetId[0] == '"' and targetId[-1] == '"':
                         targetId = targetId[1:-1]
-                    print(targetId)
+                    #print(targetId)
                     for item in self.html_collection.elements:
-                        print(item.id,targetId)
+                        #print(item.id,targetId)
                         if item.id == targetId:
                             element = item
                             break
@@ -228,20 +228,20 @@ class SimpleJSInterpreter:
                             body.append(lines[i])
                             i += 1
                         func = ";".join(body)
-                        print(func)
+                        #print(func)
                         i += 1
-                        print(element)
+                        #print(element)
                         if element is not None:
                             element.onclick = func
                         continue
                     if m.group(3) == "innerText":
-                        print(element)
+                        #print(element)
                         if element is not None:
                             text = line.split("=",1)
                             text = text[1]
-                            print(text)
+                            #print(text)
                             text  = self.eval_value(text)
-                            print(text)
+                            #print(text)
                             element.JSOveride["innerText"] =text
                             element.boundObject.configure(text_content=text)
                             #element.boundObject.configure(text="test")
@@ -284,7 +284,7 @@ class SimpleJSInterpreter:
 
 
 
-                print(val)
+                #print(val)
                 try:
                     return eval(val)
                 except Exception as e:
@@ -504,7 +504,7 @@ def browse(url, root = None, isHtml = False):
         
         for element in cssrenderer.htmlCollection.elements:
             try:
-                print(element.type,element.data)
+                #print(element.type,element.data)
                 if element.type == "title" and element.data.get("content"):
                     root.title(element.data["content"])
 
@@ -523,7 +523,7 @@ def browse(url, root = None, isHtml = False):
                         src = element.data.get("src")
                         if src and False:
                             image_url = createAbsoluteURL(url, src)
-                            print(image_url)
+                            #print(image_url)
                             #with urllib.request.urlopen(image_url) as r:
                             #
                             #    image_data = r.read()
@@ -644,8 +644,6 @@ def browse(url, root = None, isHtml = False):
 
                         element.boundObject = label
                         side = style.get("text-align","left")
-                        print(style)
-                        print(side)
                         label.pack(side=side, anchor="nw")
             except Exception as e:
                 tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
@@ -655,6 +653,34 @@ def browse(url, root = None, isHtml = False):
     except Exception as e:
         tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
         raise e
+
+
+class SearchStack:
+    def __init__(self):
+        self.stack = []
+        self.index = 0
+
+    def push(self, item):
+        self.stack.insert(self.index,item)
+        self.index += 1
+
+    def pop(self):
+        if self.index > 0:
+            self.index -= 1
+            return self.stack.pop(self.index)
+        return None
+    def back(self):
+        if self.index > 0:
+            self.index -= 1
+            return self.stack[self.index]
+        return self.stack[0]
+    def forward(self):
+        if self.index < len(self.stack):
+            self.index += 1
+            return self.stack[self.index]
+        return self.stack[-1]
+
+
 
 def GetBasisURL(url):
     segments = url.split("/")
@@ -675,20 +701,39 @@ def createAbsoluteURL(url, givenUrl):
         return url + "/" + givenUrl
 
 
+def previousSearch(root):
+    print(searchHistory.stack)
+    browse(searchHistory.back(),root)
+def nextSearch(root):
+    print(searchHistory.stack)
+    browse(searchHistory.forward(),root)
+def searchAndStack(url,root):
+
+    searchHistory.push(url)
+    print(searchHistory.stack)
+    browse(url,root)
+
 def createSearchBar(root,url = ""):
     top_frame = tk.Frame(root)
     top_frame.pack(fill="x")
 
     urlSelect = tk.Entry(root)
+    backButton = tk.Button(root,text="<",command=lambda: previousSearch(root))
+    backButton.pack(in_=top_frame, side="left")
+    backButton = tk.Button(root,text=">",command=lambda: nextSearch(root))
+    backButton.pack(in_=top_frame, side="left")
     urlSelect.delete(0, tk.END)
     urlSelect.insert(0,url)
     urlSelect.pack(in_=top_frame, side="left", fill="x", expand=True)
-    searchButton = tk.Button(root,text="Search",command=lambda: browse(urlSelect.get(), root) )
+    searchButton = tk.Button(root,text="Search",command=lambda: searchAndStack(urlSelect.get(), root) )
     searchButton.pack(in_=top_frame, side="right")
 # ================== ENTRY ==================
 
 if __name__ == "__main__":
     #browse(exampleHtml,isHtml=True)
+
+    searchHistory = SearchStack()
+
     GetBasisURL("https://femboycodedev.github.io/htmlTest.github.io/linkTest")
     root = tk.Tk()
 
@@ -698,8 +743,8 @@ if __name__ == "__main__":
     root.geometry("800x600")
     url = "https://femboycodedev.github.io/htmlTest.github.io/linkTest"
     url = "https://femboycodedev.github.io/htmlTest.github.io/jsTest1"
-    url = "https://femboycodedev.github.io/htmlTest.github.io/align1"
-    #browse(url,root)
+    #url = "https://femboycodedev.github.io/htmlTest.github.io/align1"
+    searchAndStack(url,root)
 
     root.mainloop()
     #browse("https://example.com")
