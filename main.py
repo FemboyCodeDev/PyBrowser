@@ -214,7 +214,7 @@ class AdvancedCSSRenderer(HTMLParser):
         elif self.in_script:
             self.script_buffer += data
         else:
-            print(data)
+            #print(data)
 
             self.htmlCollection.addObject(self.tag, {"content": data,"attrs":self.attrs}, tags=list(self.tag_stack))
 
@@ -265,6 +265,7 @@ def browse(url, root = None, isHtml = False):
         cssrenderer.feed(html)
 
         for name, props in cssrenderer.tag_styles.items():
+            print("css",name,props)
             continue
             txt.tag_configure(
                 name,
@@ -272,6 +273,12 @@ def browse(url, root = None, isHtml = False):
                 background=props.get("background", "white"),
                 font=("Arial", props.get("size", 10), props.get("weight", "normal")),
             )
+        fontSizes = {"p":16,"h1":32,"h2":24,"h3":20,"h4":18,"h5":16,"h6":14}   
+        for item in cssrenderer.css_rules:
+
+            print("css rules",item,cssrenderer.css_rules[item])
+            if item in fontSizes:
+                fontSizes[item] = cssrenderer.css_rules[item]["size"]
         tkObjects = []
         typeRemap = {"p":"text","h1":"text","h2":"text","h3":"text","h4":"text","h5":"text","h6":"text","a":"link"}
         for element in cssrenderer.htmlCollection.elements:
@@ -286,7 +293,7 @@ def browse(url, root = None, isHtml = False):
 
             if "text" in [element.type,remmapedType]:
 
-                fontSizes = {"p":16,"h1":32,"h2":24,"h3":20,"h4":18,"h5":16,"h6":14}
+
 
 
                 text = element.data.get("content", "")
