@@ -6,32 +6,34 @@ import re
 # Core modules
 
 class HTMLElement():
-    def __init__(self,element_type,element_data = {},id = None):
+    def __init__(self, element_type, element_data={}, id=None, tags=None):
         self.type = element_type
         self.data = element_data
         self.id = id
-
+        self.tags = tags if tags is not None else []
 
 
 class HTMLCollection():
     def __init__(self):
         self.elements = []
-    def addObject(self,element_type,element_data = {}):
-        element_id = len(self.elements)+1
-        self.elements.append(HTMLElement(element_type,element_data,id = element_id))
-        return element_id
 
+    def addObject(self, element_type, element_data={}, tags=None):
+        element_id = len(self.elements) + 1
+        self.elements.append(HTMLElement(element_type, element_data, id=element_id, tags=tags))
+        return element_id
 
 
 # ================== SIMPLE JAVASCRIPT INTERPRETER ==================
 
 class SimpleJSInterpreter:
-    def __init__(self, text_widget):
-        self.text = text_widget
+    def __init__(self, html_collection):
+        self.html_collection = html_collection
         self.vars = {}
         self.functions = {}
 
-    def run(self, code):
+    def run(self, code, tag_stack=None):
+        if tag_stack is None:
+            tag_stack = []
         lines = self.split_statements(code)
         i = 0
 
@@ -57,7 +59,7 @@ class SimpleJSInterpreter:
             # -------- function call --------
             m = re.match(r'(\w+)\s*\(\)', line)
             if m and m.group(1) in self.functions:
-                self.run(self.functions[m.group(1)])
+                self.run(self.functions[m.group(1)], tag_stack)
                 i += 1
                 continue
 
@@ -71,7 +73,7 @@ class SimpleJSInterpreter:
                     block.append(lines[i])
                     i += 1
                 if self.eval_condition(condition):
-                    self.run(";".join(block))
+                    self.run(";".join(block), tag_stack)
                 i += 1
                 continue
 
@@ -79,7 +81,7 @@ class SimpleJSInterpreter:
             m = re.match(r'document\.write\((.+?)\)', line)
             if m:
                 val = self.eval_value(m.group(1))
-                self.text.insert(tk.END, str(val))
+                self.html_collection.addObject("text", {"content": str(val)}, tags=tag_stack)
                 i += 1
                 continue
 
@@ -138,11 +140,11 @@ class SimpleJSInterpreter:
 # ================== HTML + CSS RENDERER ==================
 
 class AdvancedCSSRenderer(HTMLParser):
-    def __init__(self, root):
+    def __init__(self):
         super().__init__()
-        self.root = root
         self.css_rules = {}
         self.tag_stack = []
+        self.tag_styles = {}
 
         self.in_style = False
         self.style_buffer = ""
@@ -150,9 +152,8 @@ class AdvancedCSSRenderer(HTMLParser):
         self.in_script = False
         self.script_buffer = ""
 
-        self.js = SimpleJSInterpreter(root)
-
         self.htmlCollection = HTMLCollection()
+        self.js = SimpleJSInterpreter(self.htmlCollection)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
@@ -168,9 +169,7 @@ class AdvancedCSSRenderer(HTMLParser):
             return
 
         if tag == "br":
-
-            #self.text.insert(tk.END, "\n")
-            self.htmlCollection.addObject("br")
+            self.htmlCollection.addObject("br", tags=list(self.tag_stack))
             return
 
         styles = {}
@@ -182,7 +181,7 @@ class AdvancedCSSRenderer(HTMLParser):
         styles.update(self.parse_css_block(attrs.get("style", "")))
 
         tag_name = f"tk_{len(self.tag_stack)}"
-        self.apply_tk_styles(tag_name, styles)
+        self.tag_styles[tag_name] = styles
         self.tag_stack.append(tag_name)
 
     def handle_endtag(self, tag):
@@ -194,7 +193,7 @@ class AdvancedCSSRenderer(HTMLParser):
 
         if tag == "script":
             self.in_script = False
-            self.js.run(self.script_buffer)
+            self.js.run(self.script_buffer, self.tag_stack)
             self.script_buffer = ""
             return
 
@@ -207,7 +206,7 @@ class AdvancedCSSRenderer(HTMLParser):
         elif self.in_script:
             self.script_buffer += data
         else:
-            self.htmlCollection.addObject("text", {"content": data})
+            self.htmlCollection.addObject("text", {"content": data}, tags=list(self.tag_stack))
 
     # ---------- CSS ----------
     def parse_global_css(self, css):
@@ -232,14 +231,6 @@ class AdvancedCSSRenderer(HTMLParser):
                     props["size"] = int(size)
         return props
 
-    def apply_tk_styles(self, name, props):
-        self.text.tag_configure(
-            name,
-            foreground=props.get("foreground", "black"),
-            background=props.get("background", "white"),
-            font=("Arial", props.get("size", 10), props.get("weight", "normal")),
-        )
-
 
 # ================== BROWSER ==================
 
@@ -247,16 +238,32 @@ def browse(url):
     root = tk.Tk()
     root.title("Python Mini Browser")
 
-
-
+    txt = tk.Text(root, wrap="word")
+    txt.pack(expand=True, fill="both")
 
     try:
         with urllib.request.urlopen(url) as r:
             html = r.read().decode("utf-8", errors="ignore")
-        AdvancedCSSRenderer().feed(html)
+
+        cssrenderer = AdvancedCSSRenderer()
+        cssrenderer.feed(html)
+
+        for name, props in cssrenderer.tag_styles.items():
+            txt.tag_configure(
+                name,
+                foreground=props.get("foreground", "black"),
+                background=props.get("background", "white"),
+                font=("Arial", props.get("size", 10), props.get("weight", "normal")),
+            )
+
+        for element in cssrenderer.htmlCollection.elements:
+            if element.type == "text":
+                txt.insert(tk.END, element.data.get("content", ""), element.tags)
+            elif element.type == "br":
+                txt.insert(tk.END, "\n", element.tags)
+
     except Exception as e:
-        txt = tk.Text(root, wrap="word")
-        txt.pack(expand=True, fill="both")
+        txt.delete("1.0", tk.END)
         txt.insert(tk.END, f"Error: {e}")
 
     root.mainloop()
