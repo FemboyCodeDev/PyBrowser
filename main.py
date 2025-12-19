@@ -1,6 +1,7 @@
 import urllib.request
 import tkinter as tk
 import tkinter.font
+import tkinter.messagebox
 from html.parser import HTMLParser
 import re
 
@@ -104,6 +105,15 @@ class SimpleJSInterpreter:
             if not line or line.startswith("//"):
                 i += 1
                 continue
+
+            # -------- alert definition --------
+            m = re.match(r'alert\((.+?)\)', line)
+            if m:
+                print("JS:", m.group(1))
+                tkinter.messagebox.showinfo("Alert", m.group(1))
+                i += 1
+                continue
+
 
             # -------- function definition --------
             m = re.match(r'function\s+(\w+)\s*\(\)\s*\{', line)
