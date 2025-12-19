@@ -391,6 +391,49 @@ class SimpleJSInterpreter:
         return all_stmts
 
 
+# ================== VISUAL SYSTEM ==============
+
+class VISUALSYSTEM:
+    def __init__(self,root = None, outline = False):
+        self.objects = []
+        self.root = root
+        self.outline = outline
+    
+    def _create(self, cls, *args, **kwargs):
+        if not args and "master" not in kwargs:
+            args = (self.root,)
+        if self.outline:
+            kwargs["highlightbackground"] = "red"
+            kwargs["highlightthickness"] = 1
+        obj = cls(*args, **kwargs)
+        self.objects.append(obj)
+        return obj
+
+    def Button(self,*args,**kwargs):
+        return self._create(tk.Button, *args, **kwargs)
+
+    def Entry(self,*args,**kwargs):
+        return self._create(tk.Entry, *args, **kwargs)
+
+    def Label(self,*args,**kwargs):
+        return self._create(tk.Label, *args, **kwargs)
+
+    def Frame(self, *args,**kwargs):
+        return self._create(tk.Frame, *args, **kwargs)
+
+    def PhotoImage(self, *args, **kwargs):
+        return tk.PhotoImage(*args, **kwargs)
+
+    def clear(self):
+        for obj in self.objects:
+            try:
+                obj.destroy()
+            except Exception:
+                pass
+        self.objects = []
+
+
+
 # ================== HTML + CSS RENDERER ==================
 
 class AdvancedCSSRenderer(HTMLParser):
@@ -536,9 +579,9 @@ class AdvancedCSSRenderer(HTMLParser):
                 props[k] = v
         return props
 
-def RenderCSS(cssrenderer,content_frame):
+def RenderCSS(cssrenderer,content_frame,visualSystem):
     # A frame to hold inline elements for a single "line"
-    inline_container = tk.Frame(content_frame)
+    inline_container = visualSystem.Frame(content_frame)
     inline_container.pack(fill="x", anchor="w")
     block_elements = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "div", "li"}
     text_elements_size = {"h1": 24, "h2": 20, "h3": 18, "h4": 16, "h5": 14, "h6": 12, "p": 10}
@@ -550,11 +593,11 @@ def RenderCSS(cssrenderer,content_frame):
 
             elif element.type.startswith("end_") and element.type[4:] in block_elements:
                 # End of a block, start a new line for subsequent elements
-                inline_container = tk.Frame(content_frame)
+                inline_container = visualSystem.Frame(content_frame)
                 inline_container.pack(fill="x", anchor="w")
 
             elif element.type == "br":
-                inline_container = tk.Frame(content_frame)
+                inline_container = visualSystem.Frame(content_frame)
                 inline_container.pack(fill="x", anchor="w")
 
             elif element.type == "image":
@@ -569,9 +612,9 @@ def RenderCSS(cssrenderer,content_frame):
                         #    image_data = r.read()
 
                         image_b64 = base64.b64encode(image_data)
-                        image = tk.PhotoImage(data=image_b64)
+                        image = visualSystem.PhotoImage(data=image_b64)
 
-                        label = tk.Label(inline_container, image=image)
+                        label = visualSystem.Label(inline_container, image=image)
                         label.image = image  # Keep a reference!
                         label.pack(side="left", anchor="nw")
                         element.boundObject = label
@@ -579,20 +622,20 @@ def RenderCSS(cssrenderer,content_frame):
                     # tk.PhotoImage can fail if the image format is not supported (e.g., JPEG, PNG)
                     # It primarily supports GIF and PGM/PPM.
                     print(f"Error loading image {src}: {e}")
-                    error_label = tk.Label(inline_container, text=f"[Image: {src},{e}]", fg="red")
+                    error_label = visualSystem.Label(inline_container, text=f"[Image: {src},{e}]", fg="red")
                     error_label.pack(side="left", anchor="nw")
 
             elif element.type == "input":
                 input_type = element.data.get("attrs", {}).get("type", "text")
                 if input_type in ("text", "password", "email", "search", "tel", "url"):
-                    entry = tk.Entry(inline_container)
+                    entry = visualSystem.Entry(inline_container)
                     if input_type == "password":
                         entry.config(show="*")
                     entry.pack(side="left", anchor="nw")
                     element.boundObject = entry
                 elif input_type in ("button", "submit", "reset"):
                     button_text = element.data.get("attrs", {}).get("value", "Button")
-                    button = tk.Button(inline_container, text=button_text)
+                    button = visualSystem.Button(inline_container, text=button_text)
 
                     onclick_js = element.data.get("attrs", {}).get("onclick")
                     if element.onclick:
@@ -648,7 +691,7 @@ def RenderCSS(cssrenderer,content_frame):
                 widget_config = {k: v for k, v in widget_config.items() if v is not None}
 
                 if element.type == "button":
-                    button = tk.Button(inline_container, **widget_config)
+                    button = visualSystem.Button(inline_container, **widget_config)
 
                     onclick_js = element.data.get("attrs", {}).get("onclick")
                     if element.onclick:
@@ -682,7 +725,7 @@ def RenderCSS(cssrenderer,content_frame):
                             label.config(fg="blue", cursor="hand2", underline=True)
 
                             def make_callback(url_to_open):
-                                return lambda e: searchAndStack(createAbsoluteURL(url, url_to_open), root)
+                                return lambda e: searchAndStack(createAbsoluteURL(url, url_to_open), root,visualSystem)
 
                             label.bind("<Button-1>", make_callback(link_url))
 
@@ -691,24 +734,25 @@ def RenderCSS(cssrenderer,content_frame):
                     label.pack(side=side, anchor="nw")
         except Exception as e:
             print(e, type="error")
-            tk.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
+            visualSystem.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
 
 
 # ================== BROWSER ==================
 
-def browse(url, root = None, isHtml = False):
+def browse(url, root = None,visualSystem = None, isHtml = False):
     if root is None:
         root = tk.Tk()
+    if visualSystem is None:
+        visualSystem = VISUALSYSTEM(root)
     
     # Clear previous content
-    for widget in root.winfo_children():
-        widget.destroy()
+    visualSystem.clear()
 
-    createSearchBar(root,url)
+    createSearchBar(root,url,visualSystem)
 
     root.title("Python Mini Browser")
 
-    content_frame = tk.Frame(root)
+    content_frame = visualSystem.Frame(root)
     content_frame.pack(expand=True, fill="both")
 
     try:
@@ -730,7 +774,7 @@ def browse(url, root = None, isHtml = False):
 
         #====== Renderer Start ======
 
-        RenderCSS(cssrenderer, content_frame)
+        RenderCSS(cssrenderer, content_frame,visualSystem)
 
         #==== Renderer End ====
 
@@ -785,36 +829,54 @@ def createAbsoluteURL(url, givenUrl):
         return url + "/" + givenUrl
 
 
-def previousSearch(root):
+def previousSearch(root,visualSystem):
     print(searchHistory.stack)
     url = searchHistory.back()
     if url:
-        browse(url,root)
-def nextSearch(root):
+        browse(url,root,visualSystem)
+def nextSearch(root,visualSystem):
     print(searchHistory.stack)
     url = searchHistory.forward()
     if url:
-        browse(url,root)
-def searchAndStack(url,root):
+        browse(url,root,visualSystem)
+def searchAndStack(url,root,visualSystem):
 
     searchHistory.push(url)
     print(searchHistory.stack)
-    browse(url,root)
+    browse(url,root,visualSystem)
 
-def createSearchBar(root,url = ""):
-    top_frame = tk.Frame(root)
+def createSearchBar(root,url = "",visualSystem = None):
+    top_frame = visualSystem.Frame(root)
     top_frame.pack(fill="x")
 
-    urlSelect = tk.Entry(root)
-    backButton = tk.Button(root,text="<",command=lambda: previousSearch(root))
+    urlSelect = visualSystem.Entry()
+    backButton = visualSystem.Button(text="<",command=lambda: previousSearch(root,visualSystem))
     backButton.pack(in_=top_frame, side="left")
-    backButton = tk.Button(root,text=">",command=lambda: nextSearch(root))
+    backButton = visualSystem.Button(text=">",command=lambda: nextSearch(root,visualSystem))
     backButton.pack(in_=top_frame, side="left")
+    refreshButton = visualSystem.Button(text="Refresh",command=lambda: browse(url,root,visualSystem))
+    refreshButton.pack(in_=top_frame, side="left")
     urlSelect.delete(0, tk.END)
     urlSelect.insert(0,url)
     urlSelect.pack(in_=top_frame, side="left", fill="x", expand=True)
-    searchButton = tk.Button(root,text="Search",command=lambda: searchAndStack(urlSelect.get(), root) )
+    searchButton = visualSystem.Button(text="Search",command=lambda: searchAndStack(urlSelect.get(), root,visualSystem) )
     searchButton.pack(in_=top_frame, side="right")
+
+class BuiltinSites():
+    def __init__(self):
+        self.sites = {}
+        self.addSite("motherfuckingwebsite","https://motherfuckingwebsite.com/")
+        self.addSite("bettermotherfuckingwebsite","https://bettermotherfuckingwebsite.com")
+        self.addSite("linkTest","https://femboycodedev.github.io/htmlTest.github.io/linkTest")
+        self.addSite("JS TEST 1","https://femboycodedev.github.io/htmlTest.github.io/jsTest1")
+    def addSite(self,name,url):
+        self.sites[name] = url
+    def getSite(self,name):
+        return self.sites[name]
+
+
+
+
 # ================== ENTRY ==================
 
 if __name__ == "__main__":
@@ -822,17 +884,22 @@ if __name__ == "__main__":
 
     searchHistory = SearchStack()
 
+
+
     GetBasisURL("https://femboycodedev.github.io/htmlTest.github.io/linkTest")
     root = tk.Tk()
 
-    createSearchBar(root)
+    visualSystem = VISUALSYSTEM(root)
+
+    createSearchBar(root,visualSystem = visualSystem)
 
 
     root.geometry("800x600")
     url = "https://femboycodedev.github.io/htmlTest.github.io/linkTest"
     url = "https://femboycodedev.github.io/htmlTest.github.io/jsTest1"
     #url = "https://femboycodedev.github.io/htmlTest.github.io/align1"
-    searchAndStack(url,root)
+    url = BuiltinSites().getSite("linkTest")
+    searchAndStack(url,root,visualSystem)
 
     root.mainloop()
     #browse("https://example.com")
