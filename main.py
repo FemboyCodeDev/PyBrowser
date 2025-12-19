@@ -151,8 +151,9 @@ print = Console.print
 # ================== SIMPLE JAVASCRIPT INTERPRETER ==================
 
 class SimpleJSInterpreter:
-    def __init__(self, html_collection):
+    def __init__(self, html_collection, renderer=None):
         self.html_collection = html_collection
+        self.renderer = renderer
         self.vars = {}
         self.functions = {}
 
@@ -270,26 +271,54 @@ class SimpleJSInterpreter:
                             body.append(lines[i])
                             i += 1
                         func = ";".join(body)
-                        #print(func)
                         i += 1
-                        #print(element)
                         if element is not None:
                             element.onclick = func
                         continue
                     if m.group(3) == "innerText":
-                        #print(element)
                         if element is not None:
                             text = line.split("=",1)
                             text = text[1]
-                            #print(text)
                             text  = self.eval_value(text)
-                            #print(text)
                             element.JSOveride["innerText"] =text
                             element.boundObject.configure(text_content=text)
-                            #element.boundObject.configure(text="test")
-
                         i+=1
-
+                        continue
+                    if m.group(3) == "innerHTML":
+                        if element is not None:
+                            text = line.split("=",1)
+                            text = text[1]
+                            text  = self.eval_value(text)
+                            element.JSOveride["innerHTML"] =text
+                            element.boundObject.configure(text_content=text)
+                        i+=1
+                        continue
+                    if m.group(3) == "outerHTML":
+                        if element is not None:
+                            text = line.split("=",1)
+                            text = text[1]
+                            text  = self.eval_value(text)
+                            
+                            if self.renderer:
+                                temp_renderer = self.renderer.__class__()
+                                temp_renderer.css_rules = self.renderer.css_rules
+                                temp_renderer.tag_styles = self.renderer.tag_styles.copy()
+                                temp_renderer.js.vars = self.vars
+                                temp_renderer.js.functions = self.functions
+                                temp_renderer.feed(text)
+                                new_elements = temp_renderer.htmlCollection.elements
+                                self.renderer.tag_styles.update(temp_renderer.tag_styles)
+                                
+                                if element in self.html_collection.elements:
+                                    idx = self.html_collection.elements.index(element)
+                                    self.html_collection.elements[idx:idx+1] = new_elements
+                                    
+                                    if element.boundObject:
+                                        content_frame = element.boundObject.master.master
+                                        for widget in content_frame.winfo_children():
+                                            widget.destroy()
+                                        RenderCSS(self.renderer, content_frame)
+                        i+=1
                         continue
 
                     #
@@ -378,7 +407,7 @@ class AdvancedCSSRenderer(HTMLParser):
         self.script_buffer = ""
 
         self.htmlCollection = HTMLCollection()
-        self.js = SimpleJSInterpreter(self.htmlCollection)
+        self.js = SimpleJSInterpreter(self.htmlCollection, self)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
