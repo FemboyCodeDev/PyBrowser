@@ -162,7 +162,7 @@ class SimpleJSInterpreter:
         if tag_stack is None:
             tag_stack = []
         lines = self.split_statements(code)
-        # print(lines)
+        print(lines)
         i = 0
 
         while i < len(lines):
@@ -290,9 +290,9 @@ class SimpleJSInterpreter:
 
                 func_code = ";".join(body)
                 
-                def interval_func():
-                    print("Running Func")
-                    self.run(func_code)
+                def interval_func(code=func_code):
+                    #print("Running Func",code)
+                    self.run(code)
                     if self.renderer and self.renderer.visualSystem and self.renderer.visualSystem.root:
                          self.renderer.visualSystem.root.after(delay, interval_func)
                 
@@ -313,7 +313,7 @@ class SimpleJSInterpreter:
 
                  func_code = ";".join(body)
                  
-                 def on_key(event):
+                 def on_key(event, code=func_code):
                      js_keycode = 0
                      if event.keysym == 'Left': js_keycode = 37
                      elif event.keysym == 'Up': js_keycode = 38
@@ -325,7 +325,7 @@ class SimpleJSInterpreter:
                              self.keyCode = code
                      
                      self.vars['event'] = Event(js_keycode)
-                     self.run(func_code)
+                     self.run(code)
                  
                  if self.renderer and self.renderer.visualSystem and self.renderer.visualSystem.root:
                      self.renderer.visualSystem.root.bind("<Key>", on_key)
