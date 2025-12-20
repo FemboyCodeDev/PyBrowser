@@ -162,7 +162,7 @@ class SimpleJSInterpreter:
         if tag_stack is None:
             tag_stack = []
         lines = self.split_statements(code)
-        print(lines)
+        # print(lines)
         i = 0
 
         while i < len(lines):
@@ -183,16 +183,21 @@ class SimpleJSInterpreter:
 
 
             # -------- function definition --------
-            m = re.match(r'function\s+(\w+)\s*\(\)\s*\{', line)
+            m = re.match(r'function\s+(\w+)\s*\((.*?)\)\s*\{', line)
             if m:
                 fname = m.group(1)
+                args = m.group(2)
                 body = []
                 i += 1
-                while i < len(lines) and "}" not in lines[i]:
-                    body.append(lines[i])
+                brace_count = 1
+                while i < len(lines) and brace_count > 0:
+                    l = lines[i]
+                    brace_count += l.count("{")
+                    brace_count -= l.count("}")
+                    if brace_count > 0:
+                        body.append(l)
                     i += 1
                 self.functions[fname] = ";".join(body)
-                i += 1
                 continue
 
             # -------- function call --------
@@ -208,13 +213,126 @@ class SimpleJSInterpreter:
                 condition = m.group(1)
                 block = []
                 i += 1
-                while i < len(lines) and "}" not in lines[i]:
-                    block.append(lines[i])
+                brace_count = 1
+                while i < len(lines) and brace_count > 0:
+                    l = lines[i]
+                    brace_count += l.count("{")
+                    brace_count -= l.count("}")
+                    if brace_count > 0:
+                        block.append(l)
                     i += 1
                 if self.eval_condition(condition):
                     self.run(";".join(block), tag_stack)
+                continue
+            
+            # -------- else if --------
+            m = re.match(r'else\s+if\s*\((.*?)\)\s*\{', line)
+            if m:
+                condition = m.group(1)
+                block = []
+                i += 1
+                brace_count = 1
+                while i < len(lines) and brace_count > 0:
+                    l = lines[i]
+                    brace_count += l.count("{")
+                    brace_count -= l.count("}")
+                    if brace_count > 0:
+                        block.append(l)
+                    i += 1
+                if self.eval_condition(condition):
+                    self.run(";".join(block), tag_stack)
+                continue
+
+            # -------- for loop --------
+            m = re.match(r'for\s*\((.+?);(.+?);(.+?)\)\s*\{', line)
+            if m:
+                init = m.group(1)
+                cond = m.group(2)
+                incr = m.group(3)
+                
+                self.run(init)
+                
+                body = []
+                i += 1
+                brace_count = 1
+                while i < len(lines) and brace_count > 0:
+                    l = lines[i]
+                    brace_count += l.count("{")
+                    brace_count -= l.count("}")
+                    if brace_count > 0:
+                        body.append(l)
+                    i += 1
+                body_code = ";".join(body)
+                
+                count = 0
+                while self.eval_condition(cond) and count < 10000:
+                    self.run(body_code)
+                    self.run(incr)
+                    count += 1
+                continue
+
+            # -------- setInterval --------
+            m = re.match(r'setInterval\s*\(\s*function\s*\(\)\s*\{', line)
+            if m:
+                body = []
+                i += 1
+                while i < len(lines):
+                    l = lines[i].strip()
+                    if l.startswith("},"):
+                        break
+                    body.append(lines[i])
+                    i += 1
+
+                delay_match = re.search(r'\}\s*,\s*(\d+)\s*\)', lines[i])
+                delay = 200
+                if delay_match:
+                    delay = int(delay_match.group(1))
+
+                func_code = ";".join(body)
+                
+                def interval_func():
+                    print("Running Func")
+                    self.run(func_code)
+                    if self.renderer and self.renderer.visualSystem and self.renderer.visualSystem.root:
+                         self.renderer.visualSystem.root.after(delay, interval_func)
+                
+                interval_func()
                 i += 1
                 continue
+
+            # -------- addEventListener --------
+            m = re.match(r"document\.addEventListener\('keydown',\s*function\(event\)\s*\{", line)
+            if m:
+                 body = []
+                 i += 1
+                 while i < len(lines):
+                     if lines[i].strip().startswith("},"):
+                         break
+                     body.append(lines[i])
+                     i += 1
+
+                 func_code = ";".join(body)
+                 
+                 def on_key(event):
+                     js_keycode = 0
+                     if event.keysym == 'Left': js_keycode = 37
+                     elif event.keysym == 'Up': js_keycode = 38
+                     elif event.keysym == 'Right': js_keycode = 39
+                     elif event.keysym == 'Down': js_keycode = 40
+                     
+                     class Event:
+                         def __init__(self, code):
+                             self.keyCode = code
+                     
+                     self.vars['event'] = Event(js_keycode)
+                     self.run(func_code)
+                 
+                 if self.renderer and self.renderer.visualSystem and self.renderer.visualSystem.root:
+                     self.renderer.visualSystem.root.bind("<Key>", on_key)
+                     self.renderer.visualSystem.root.focus_set()
+                 
+                 i += 1
+                 continue
 
             # -------- document.write --------
             m = re.match(r'document\.write\((.+?)\)', line)
@@ -231,18 +349,88 @@ class SimpleJSInterpreter:
                 i += 1
                 continue
 
-            # -------- var assignment --------
-            m = re.match(r'var\s+(\w+)\s*=\s*(.+)', line)
+            # -------- var/let/const assignment --------
+            m = re.match(r'(var|let|const)\s+(\w+)\s*=\s*(.+)', line)
             if m:
-                self.vars[m.group(1)] = self.eval_value(m.group(2))
+                self.vars[m.group(2)] = self.eval_value(m.group(3))
                 i += 1
                 continue
-            # -------- const assignment --------
-            m = re.match(r'const\s+(\w+)\s*=\s*(.+)', line)
+            
+            # -------- var/let/const declaration (no assignment) --------
+            m = re.match(r'(var|let|const)\s+(\w+)', line)
             if m:
-                self.vars[m.group(1)] = self.eval_value(m.group(2))
+                self.vars[m.group(2)] = ""
                 i += 1
                 continue
+
+            # -------- Array pop --------
+            m = re.match(r'let\s+(\w+)\s*=\s*(\w+)\.pop\(\)', line)
+            if m:
+                target = m.group(1)
+                arr_name = m.group(2)
+                if arr_name in self.vars and isinstance(self.vars[arr_name], list):
+                    if self.vars[arr_name]:
+                        self.vars[target] = self.vars[arr_name].pop()
+                i += 1
+                continue
+
+            # -------- Array unshift --------
+            m = re.match(r'(\w+)\.unshift\((.+)\)', line)
+            if m:
+                arr_name = m.group(1)
+                val = m.group(2)
+                parsed_val = self.eval_value(val)
+                if arr_name in self.vars and isinstance(self.vars[arr_name], list):
+                    self.vars[arr_name].insert(0, parsed_val)
+                i += 1
+                continue
+            
+            # -------- Array assignment board[i] = v --------
+            m = re.match(r'(\w+)\[(.+)\]\s*=\s*(.+)', line)
+            if m:
+                arr_name = m.group(1)
+                idx_expr = m.group(2)
+                val_expr = m.group(3)
+                if arr_name in self.vars:
+                    idx = self.eval_value(idx_expr)
+                    val = self.eval_value(val_expr)
+                    try:
+                        self.vars[arr_name][int(idx)] = val
+                    except:
+                        pass
+                i += 1
+                continue
+
+            # -------- Assignment var = expr --------
+            m = re.match(r'(\w+)\s*=\s*(.+)', line)
+            if m:
+
+                var_name = m.group(1)
+                expr = m.group(2)
+                print(m.group(1),m.group(2))
+                self.vars[var_name] = self.eval_value(expr)
+                i += 1
+                continue
+            # -------- Assignment let var = expr --------
+            m = re.match(r'let (\w+)\s*=\s*(.+)', line)
+            if m:
+                print(m)
+                var_name = m.group(1)
+                expr = m.group(2)
+                self.vars[var_name] = self.eval_value(expr)
+                i += 1
+                continue
+            # -------- Increment/Decrement --------
+            m = re.match(r'(\w+)(\+\+|--)', line)
+            if m:
+                var = m.group(1)
+                op = m.group(2)
+                if var in self.vars:
+                    if op == "++": self.vars[var] += 1
+                    else: self.vars[var] -= 1
+                i += 1
+                continue
+
             # -------- docuemnt functions -------
             # for stuff like document.getElementById()
             m = re.match(r"document\.(\w+)\((.+?)\)\.?(\w+)?", line)
@@ -267,11 +455,15 @@ class SimpleJSInterpreter:
                     if m.group(3) == "onclick":
                         body = []
                         i += 1
-                        while i < len(lines) and "}" not in lines[i]:
-                            body.append(lines[i])
+                        brace_count = 1
+                        while i < len(lines) and brace_count > 0:
+                            l = lines[i]
+                            brace_count += l.count("{")
+                            brace_count -= l.count("}")
+                            if brace_count > 0:
+                                body.append(l)
                             i += 1
                         func = ";".join(body)
-                        i += 1
                         if element is not None:
                             element.onclick = func
                         continue
@@ -281,7 +473,8 @@ class SimpleJSInterpreter:
                             text = text[1]
                             text  = self.eval_value(text)
                             element.JSOveride["innerText"] =text
-                            element.boundObject.configure(text_content=text)
+                            if element.boundObject is not None:
+                                element.boundObject.configure(text_content=text)
                         i+=1
                         continue
                     if m.group(3) == "innerHTML":
@@ -300,7 +493,7 @@ class SimpleJSInterpreter:
                             text  = self.eval_value(text)
                             
                             if self.renderer:
-                                temp_renderer = self.renderer.__class__()
+                                temp_renderer = self.renderer.__class__(self.renderer.visualSystem)
                                 temp_renderer.css_rules = self.renderer.css_rules
                                 temp_renderer.tag_styles = self.renderer.tag_styles.copy()
                                 temp_renderer.js.vars = self.vars
@@ -317,7 +510,7 @@ class SimpleJSInterpreter:
                                         content_frame = element.boundObject.master.master
                                         for widget in content_frame.winfo_children():
                                             widget.destroy()
-                                        RenderCSS(self.renderer, content_frame)
+                                        RenderCSS(self.renderer, content_frame, self.renderer.visualSystem)
                         i+=1
                         continue
 
@@ -337,8 +530,21 @@ class SimpleJSInterpreter:
             return True
         if val == "false":
             return False
-        else:
-            if True in [x in val for x in list("+-/*")]:
+        
+        if "new Array" in val:
+             m = re.match(r'new\s+Array\((.+)\)\.fill\((.+)\)', val)
+             if m:
+                 size = self.eval_value(m.group(1))
+                 fill = self.eval_value(m.group(2))
+                 return [fill] * size
+        
+        if val.startswith("{") and val.endswith("}"):
+            val = re.sub(r'(\w+):', r"'\1':", val)
+        
+        val = re.sub(r'\.x\b', "['x']", val)
+        val = re.sub(r'\.y\b', "['y']", val)
+
+        if True in [x in val for x in list("+-/*")]:
                 #Replace variables
                 if True in [x in val for x in ["'", '"']]:
                     operationType = "string"
@@ -351,7 +557,8 @@ class SimpleJSInterpreter:
                         var_value = f"str({var_value})"
                     elif operationType == "number":
                         var_value = f"{var_value}"
-                    val = val.replace(var_name, str(var_value))
+                    
+                    val = re.sub(r'\b' + re.escape(var_name) + r'\b', str(var_value), val)
 
 
 
@@ -359,27 +566,39 @@ class SimpleJSInterpreter:
                 try:
                     return eval(val)
                 except Exception as e:
-                    print(e,type = "error")
+                    print("Evaluation Error:",e,type = "error")
                     return val
 
         return self.vars.get(val, "")
 
     def eval_condition(self, cond):
-        m = re.match(r'(\w+)\s*={2,3}\s*(.+)', cond)
-        if m:
-            return self.vars.get(m.group(1)) == self.eval_value(m.group(2))
-        return bool(self.vars.get(cond))
+        cond = re.sub(r'\.x\b', "['x']", cond)
+        cond = re.sub(r'\.y\b', "['y']", cond)
+        
+        for var_name, var_value in self.vars.items():
+             cond = re.sub(r'\b' + re.escape(var_name) + r'\b', str(var_value), cond)
+        
+        try:
+            return eval(cond)
+        except:
+            return False
 
     def split_statements(self, code):
         all_stmts = []
         for line in code.splitlines():
             stmts, buf, depth = [], "", 0
+            paren_depth = 0
             for c in line:
                 if c == "{":
                     depth += 1
                 elif c == "}":
                     depth -= 1
-                if c == ";" and depth == 0:
+                elif c == "(":
+                    paren_depth += 1
+                elif c == ")":
+                    paren_depth -= 1
+                
+                if c == ";" and depth == 0 and paren_depth == 0:
                     if buf.strip():
                         stmts.append(buf.strip())
                     buf = ""
@@ -398,7 +617,7 @@ class VISUALSYSTEM:
         self.objects = []
         self.root = root
         self.outline = outline
-    
+
     def _create(self, cls, *args, **kwargs):
         if not args and "master" not in kwargs:
             args = (self.root,)
@@ -437,8 +656,9 @@ class VISUALSYSTEM:
 # ================== HTML + CSS RENDERER ==================
 
 class AdvancedCSSRenderer(HTMLParser):
-    def __init__(self):
+    def __init__(self, visualSystem=None):
         super().__init__()
+        self.visualSystem = visualSystem
         self.css_rules = {}
         self.tag_stack = []
         self.tag_styles = {}
@@ -474,7 +694,7 @@ class AdvancedCSSRenderer(HTMLParser):
         if tag == "br":
             self.htmlCollection.addObject("br")
             return
-        
+
         if tag == "span":
             pass
 
@@ -488,7 +708,7 @@ class AdvancedCSSRenderer(HTMLParser):
 
         style_tag_name = f"style_{len(self.tag_styles)}"
         self.tag_styles[style_tag_name] = styles
-        
+
         # Push the tag, its attributes, and its generated style name to the stack
         current_element = self.htmlCollection.addObject(tag, {"attrs": attrs}, tags=[style_tag_name], element_id=attrs.get("id"))
         self.tag_stack.append((tag, attrs, style_tag_name, current_element))
@@ -525,7 +745,7 @@ class AdvancedCSSRenderer(HTMLParser):
             tag, attrs, _, element = self.tag_stack[-1]
             # Get all styles from the stack to handle nesting
             style_tags = [s for _, _, s, _ in self.tag_stack]
-            
+
             if data.strip():
                 if not element.data.get("content"):
                     element.data["content"] = ""
@@ -744,7 +964,7 @@ def browse(url, root = None,visualSystem = None, isHtml = False):
         root = tk.Tk()
     if visualSystem is None:
         visualSystem = VISUALSYSTEM(root)
-    
+
     # Clear previous content
     visualSystem.clear()
 
@@ -763,8 +983,8 @@ def browse(url, root = None,visualSystem = None, isHtml = False):
                 html = r.read().decode("utf-8", errors="ignore")
         else:
             html = url
-            
-        cssrenderer = AdvancedCSSRenderer()
+
+        cssrenderer = AdvancedCSSRenderer(visualSystem)
         cssrenderer.feed(html)
 
 
@@ -869,6 +1089,7 @@ class BuiltinSites():
         self.addSite("bettermotherfuckingwebsite","https://bettermotherfuckingwebsite.com")
         self.addSite("linkTest","https://femboycodedev.github.io/htmlTest.github.io/linkTest")
         self.addSite("JS TEST 1","https://femboycodedev.github.io/htmlTest.github.io/jsTest1")
+        self.addSite("PyBrowserDino","https://femboycodedev.github.io/PyBrowserDino/")
     def addSite(self,name,url):
         self.sites[name] = url
     def getSite(self,name):
@@ -899,6 +1120,7 @@ if __name__ == "__main__":
     url = "https://femboycodedev.github.io/htmlTest.github.io/jsTest1"
     #url = "https://femboycodedev.github.io/htmlTest.github.io/align1"
     url = BuiltinSites().getSite("linkTest")
+    url = BuiltinSites().getSite("PyBrowserDino")
     searchAndStack(url,root,visualSystem)
 
     root.mainloop()
