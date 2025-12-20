@@ -956,7 +956,6 @@ def RenderCSS(cssrenderer,content_frame,visualSystem):
             print(e, type="error")
             visualSystem.Label(content_frame, text=f"Error: {e}", fg="red").pack(anchor="w")
 
-
 # ================== BROWSER ==================
 
 def browse(url, root = None,visualSystem = None, isHtml = False):
@@ -986,11 +985,6 @@ def browse(url, root = None,visualSystem = None, isHtml = False):
 
         cssrenderer = AdvancedCSSRenderer(visualSystem)
         cssrenderer.feed(html)
-
-
-
-
-
 
         #====== Renderer Start ======
 
